@@ -4,9 +4,11 @@ import (
 	"encoding/csv"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -203,6 +205,52 @@ func buildRealmGroups() {
 	}
 }
 
+// ---------- image caching ----------
+
+const (
+	imageDir       = "images/characters"
+	remoteImageFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/buddy/%s/%s.png"
+)
+
+func ensureCharacterImage(id string) string {
+	localPath := filepath.Join(imageDir, id+".png")
+	if _, err := os.Stat(localPath); err == nil {
+		return "/images/characters/" + id + ".png"
+	}
+	url := fmt.Sprintf(remoteImageFmt, id, id)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Printf("fetch image %s: %v", id, err)
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("fetch image %s: status %d", id, resp.StatusCode)
+		return ""
+	}
+	f, err := os.Create(localPath)
+	if err != nil {
+		log.Printf("create image file %s: %v", localPath, err)
+		return ""
+	}
+	defer f.Close()
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		log.Printf("write image %s: %v", localPath, err)
+		return ""
+	}
+	log.Printf("cached image for character %s", id)
+	return "/images/characters/" + id + ".png"
+}
+
+func cacheAllCharacterImages() {
+	os.MkdirAll(imageDir, 0o755)
+	for i := range characters {
+		if img := ensureCharacterImage(characters[i].ID); img != "" {
+			characters[i].Img = img
+		}
+	}
+}
+
 // ---------- templates ----------
 
 var funcMap = template.FuncMap{
@@ -362,10 +410,14 @@ func main() {
 	buildRealmGroups()
 	log.Printf("Loaded %d characters", len(characters))
 
+	log.Println("Caching character images...")
+	cacheAllCharacterImages()
+
+	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/char/", charHandler)
 
-	addr := ":9090"
+	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
