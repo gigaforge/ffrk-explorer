@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"sync"
 	"strconv"
@@ -25,17 +26,24 @@ type Character struct {
 	Schools map[string]int // school name -> max rarity (1-6)
 }
 
+type StatusEffect struct {
+	Name        string
+	Description string
+	Duration    string
+}
+
 type SoulBreak struct {
-	Character string
-	Img       string
-	Name      string
-	Tier      string
-	SBVer     string
-	Type      string
-	Element   string
-	Time      string
-	Effects   string
-	ID        string
+	Character      string
+	Img            string
+	Name           string
+	Tier           string
+	SBVer          string
+	Type           string
+	Element        string
+	Time           string
+	Effects        string
+	ID             string
+	MatchedEffects []StatusEffect
 }
 
 type HeroAbility struct {
@@ -68,6 +76,7 @@ var (
 	characters    []Character
 	soulBreaks    map[string][]SoulBreak  // keyed by character name
 	heroAbilities map[string][]HeroAbility // keyed by character name
+	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
 )
@@ -170,6 +179,64 @@ func loadHeroAbilities() {
 			ID:        row["ID"],
 		}
 		heroAbilities[ha.Character] = append(heroAbilities[ha.Character], ha)
+	}
+}
+
+func loadStatuses() {
+	statusEffects = make(map[string]StatusEffect)
+	rows := mustReadCSV("Status.csv")
+	for _, row := range rows {
+		name := strings.TrimSpace(row["Common Name"])
+		if name == "" {
+			continue
+		}
+		statusEffects[name] = StatusEffect{
+			Name:        name,
+			Description: strings.TrimSpace(row["Effects"]),
+			Duration:    strings.TrimSpace(row["Default Duration"]),
+		}
+	}
+	log.Printf("Loaded %d status effects", len(statusEffects))
+}
+
+var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
+var pctRe = regexp.MustCompile(`([+-])\d+%`)
+
+func lookupStatus(term string) (StatusEffect, bool) {
+	// Try exact match first
+	if se, ok := statusEffects[term]; ok {
+		return se, true
+	}
+	// Fallback: replace specific percentages (+30%, -50%) with +X%/-X%
+	generic := pctRe.ReplaceAllString(term, "${1}X%")
+	if generic != term {
+		if se, ok := statusEffects[generic]; ok {
+			// Substitute actual percentages into the description
+			// Build a list of the actual values from the term
+			actuals := pctRe.FindAllString(term, -1)
+			result := se
+			result.Name = term
+			result.Description = se.Description
+			for _, actual := range actuals {
+				result.Description = strings.Replace(result.Description, string(actual[0])+"X%", actual, 1)
+			}
+			return result, true
+		}
+	}
+	return StatusEffect{}, false
+}
+
+func matchSoulBreakEffects() {
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			matches := bracketRe.FindAllStringSubmatch(sbList[i].Effects, -1)
+			for _, m := range matches {
+				if se, ok := lookupStatus(m[1]); ok {
+					sbList[i].MatchedEffects = append(sbList[i].MatchedEffects, se)
+				}
+			}
+		}
+		soulBreaks[name] = sbList
 	}
 }
 
@@ -383,6 +450,23 @@ th { background: #0f3460; padding: 6px 8px; text-align: left; }
 td { background: #16213e; padding: 6px 8px; border-bottom: 1px solid #1a1a2e; }
 td img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
 .effects { max-width: 500px; }
+.sb-icon { width: 64px; height: 64px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.sb-icon img { width: 96px; height: 96px; object-fit: contain; margin: -16px; }
+tr.sb-row { cursor: pointer; }
+tr.sb-row:hover td { background: #1b2a4a; }
+td.sb-chevron { width: 16px; padding: 6px 2px; text-align: center; }
+td.sb-chevron .chevron { display: inline-block; font-size: 14px; color: #e94560;
+                          transition: transform 0.2s; }
+tr.sb-row.expanded td.sb-chevron .chevron { transform: rotate(90deg); }
+tr.sb-detail { display: none; }
+tr.sb-detail.visible { display: table-row; }
+tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
+.effect-list { list-style: none; padding: 0; margin: 0; }
+.effect-list li { padding: 4px 0; border-bottom: 1px solid #16213e; }
+.effect-list li:last-child { border-bottom: none; }
+.effect-name { color: #e94560; font-weight: bold; }
+.effect-duration { color: #e9c46a; font-size: 12px; margin-left: 8px; }
+.effect-desc { color: #aaa; font-size: 12px; display: block; margin-top: 2px; }
 </style>
 </head><body>
 <a class="back" href="/">← All Characters</a>
@@ -416,10 +500,11 @@ td img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle;
 {{if .SoulBreaks}}
 <h2>Soul Breaks ({{len .SoulBreaks}})</h2>
 <table>
-<tr><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+<tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr>
-  <td>{{if .Img}}<img src="{{.Img}}">{{end}}</td>
+<tr class="sb-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+  <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
   <td>{{.Type}}</td>
@@ -427,11 +512,33 @@ td img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle;
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
+{{if .MatchedEffects}}
+<tr class="sb-detail">
+  <td colspan="8">
+    <ul class="effect-list">
+    {{range .MatchedEffects}}
+      <li>
+        <span class="effect-name">{{.Name}}</span>
+        {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+        <span class="effect-desc">{{.Description}}</span>
+      </li>
+    {{end}}
+    </ul>
+  </td>
+</tr>
+{{end}}
 {{end}}
 </table>
 {{end}}
 
-
+<script>
+function toggleDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('sb-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+}
+</script>
 </body></html>`))
 
 // ---------- handlers ----------
@@ -467,6 +574,8 @@ func main() {
 	loadCharacters()
 	loadSoulBreaks()
 	loadHeroAbilities()
+	loadStatuses()
+	matchSoulBreakEffects()
 
 	log.Println("Caching images...")
 	cacheAllImages()
