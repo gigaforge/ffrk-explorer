@@ -434,7 +434,8 @@ var charTmpl = template.Must(template.New("char").Funcs(funcMap).Parse(`<!DOCTYP
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-       background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 1000px; margin: 0 auto; }
+       background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 1200px; margin: 0 auto;
+       font-size: 16px; }
 a { color: #e94560; }
 h1 { color: #e94560; margin-bottom: 4px; }
 .subtitle { color: #888; margin-bottom: 20px; }
@@ -443,12 +444,12 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
      padding: 4px 16px; border-radius: 4px; margin: 20px 0 12px; font-size: 1em; }
 .school-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .school-badge { background: #16213e; border: 1px solid #0f3460; border-radius: 4px;
-                padding: 4px 10px; font-size: 13px; }
+                padding: 4px 10px; font-size: 15px; }
 .school-badge .stars { color: #e9c46a; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 15px; }
 th { background: #0f3460; padding: 6px 8px; text-align: left; }
 td { background: #16213e; padding: 6px 8px; border-bottom: 1px solid #1a1a2e; }
-td img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
+td img { width: 64px; height: 64px; object-fit: contain; vertical-align: middle; }
 .effects { max-width: 500px; }
 .sb-icon { width: 64px; height: 64px; overflow: hidden; display: inline-block; vertical-align: middle; }
 .sb-icon img { width: 96px; height: 96px; object-fit: contain; margin: -16px; }
@@ -465,8 +466,8 @@ tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
 .effect-list li { padding: 4px 0; border-bottom: 1px solid #16213e; }
 .effect-list li:last-child { border-bottom: none; }
 .effect-name { color: #e94560; font-weight: bold; }
-.effect-duration { color: #e9c46a; font-size: 12px; margin-left: 8px; }
-.effect-desc { color: #aaa; font-size: 12px; display: block; margin-top: 2px; }
+.effect-duration { color: #e9c46a; font-size: 14px; margin-left: 8px; }
+.effect-desc { color: #aaa; font-size: 14px; display: block; margin-top: 2px; }
 </style>
 </head><body>
 <a class="back" href="/">← All Characters</a>
