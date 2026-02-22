@@ -407,11 +407,12 @@ func main() {
 	loadCharacters()
 	loadSoulBreaks()
 	loadHeroAbilities()
-	buildRealmGroups()
-	log.Printf("Loaded %d characters", len(characters))
 
 	log.Println("Caching character images...")
 	cacheAllCharacterImages()
+
+	buildRealmGroups()
+	log.Printf("Loaded %d characters", len(characters))
 
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
 	http.HandleFunc("/", indexHandler)
