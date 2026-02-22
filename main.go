@@ -32,6 +32,19 @@ type StatusEffect struct {
 	Duration    string
 }
 
+type BurstCommand struct {
+	Img            string
+	Name           string
+	Type           string
+	Target         string
+	Element        string
+	Time           string
+	Effects        string
+	School         string
+	ID             string
+	MatchedEffects []StatusEffect
+}
+
 type SoulBreak struct {
 	Character      string
 	Img            string
@@ -44,6 +57,7 @@ type SoulBreak struct {
 	Effects        string
 	ID             string
 	MatchedEffects []StatusEffect
+	BurstCommands  []BurstCommand
 }
 
 type HeroAbility struct {
@@ -76,6 +90,7 @@ var (
 	characters    []Character
 	soulBreaks    map[string][]SoulBreak  // keyed by character name
 	heroAbilities map[string][]HeroAbility // keyed by character name
+	burstCommands map[string][]BurstCommand // keyed by "Character|Source"
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
@@ -179,6 +194,59 @@ func loadHeroAbilities() {
 			ID:        row["ID"],
 		}
 		heroAbilities[ha.Character] = append(heroAbilities[ha.Character], ha)
+	}
+}
+
+func loadBurstCommands() {
+	burstCommands = make(map[string][]BurstCommand)
+	rows := mustReadCSV("Burst.csv")
+	for _, row := range rows {
+		bc := BurstCommand{
+			Name:    row["Name"],
+			Type:    row["Type"],
+			Target:  row["Target"],
+			Element: row["Element"],
+			Time:    row["Time"],
+			Effects: row["Effects"],
+			School:  row["School"],
+			ID:      row["ID"],
+		}
+		key := row["Character"] + "|" + row["Source"]
+		burstCommands[key] = append(burstCommands[key], bc)
+	}
+	// Sort each group so ID ending in '1' comes before '2'
+	for key, cmds := range burstCommands {
+		sort.Slice(cmds, func(i, j int) bool {
+			return cmds[i].ID < cmds[j].ID
+		})
+		burstCommands[key] = cmds
+	}
+	log.Printf("Loaded %d burst command groups", len(burstCommands))
+}
+
+func matchBurstCommands() {
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			if sbList[i].Tier != "BSB" {
+				continue
+			}
+			key := sbList[i].Character + "|" + sbList[i].Name
+			if cmds, ok := burstCommands[key]; ok {
+				// Deep copy and match status effects for each command
+				matched := make([]BurstCommand, len(cmds))
+				copy(matched, cmds)
+				for j := range matched {
+					matches := bracketRe.FindAllStringSubmatch(matched[j].Effects, -1)
+					for _, m := range matches {
+						if se, ok := lookupStatus(m[1]); ok {
+							matched[j].MatchedEffects = append(matched[j].MatchedEffects, se)
+						}
+					}
+				}
+				sbList[i].BurstCommands = matched
+			}
+		}
+		soulBreaks[name] = sbList
 	}
 }
 
@@ -317,7 +385,7 @@ type imageJob struct {
 }
 
 func cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst"}
 	for _, d := range dirs {
 		os.MkdirAll(d, 0o755)
 	}
@@ -326,6 +394,7 @@ func cacheAllImages() {
 		charFmt    = "https://dff.sp.mbga.jp/dff/static/lang/image/buddy/%s/%s.png"
 		abilityFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_256.png"
 		sbFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/soulstrike/%s/%s_256.png"
+		burstFmt   = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_128.png"
 	)
 
 	// Collect all jobs
@@ -350,6 +419,11 @@ func cacheAllImages() {
 		for i := range sbList {
 			if sbList[i].ID != "" {
 				jobs = append(jobs, imageJob{"images/soulbreaks", "images/soulbreaks", sbFmt, sbList[i].ID, &sbList[i].Img})
+			}
+			for j := range sbList[i].BurstCommands {
+				if sbList[i].BurstCommands[j].ID != "" {
+					jobs = append(jobs, imageJob{"images/burst", "images/burst", burstFmt, sbList[i].BurstCommands[j].ID, &sbList[i].BurstCommands[j].Img})
+				}
 			}
 		}
 		soulBreaks[name] = sbList
@@ -468,6 +542,21 @@ tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
 .effect-name { color: #e94560; font-weight: bold; }
 .effect-duration { color: #e9c46a; font-size: 14px; margin-left: 8px; }
 .effect-desc { color: #aaa; font-size: 14px; display: block; margin-top: 2px; }
+.burst-commands { margin-bottom: 8px; }
+.burst-title { color: #e94560; font-weight: bold; margin-bottom: 6px; font-size: 15px; }
+.burst-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 14px; }
+.burst-table th { background: #162040; padding: 4px 6px; text-align: left; font-size: 13px; }
+.burst-table td { background: #0f1a2e; padding: 4px 6px; border-bottom: 1px solid #1a1a2e; }
+.burst-icon { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
+tr.bc-row { cursor: pointer; }
+tr.bc-row:hover td { background: #152035; }
+tr.bc-row td.bc-chevron { width: 16px; padding: 4px 2px; text-align: center; }
+tr.bc-row td.bc-chevron .chevron { display: inline-block; font-size: 12px; color: #e94560;
+                                    transition: transform 0.2s; }
+tr.bc-row.expanded td.bc-chevron .chevron { transform: rotate(90deg); }
+tr.bc-detail { display: none; }
+tr.bc-detail.visible { display: table-row; }
+tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </style>
 </head><body>
 <a class="back" href="/">← All Characters</a>
@@ -503,8 +592,8 @@ tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
 <table>
 <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleDetail(this)">
-  <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -513,9 +602,46 @@ tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if .MatchedEffects}}
+{{if or .MatchedEffects .BurstCommands}}
 <tr class="sb-detail">
   <td colspan="8">
+    {{if .BurstCommands}}
+    <div class="burst-commands">
+      <div class="burst-title">Burst Commands</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .BurstCommands}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="9">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .MatchedEffects}}
     <ul class="effect-list">
     {{range .MatchedEffects}}
       <li>
@@ -525,6 +651,7 @@ tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
       </li>
     {{end}}
     </ul>
+    {{end}}
   </td>
 </tr>
 {{end}}
@@ -538,6 +665,13 @@ function toggleDetail(row) {
   if (!detail || !detail.classList.contains('sb-detail')) return;
   row.classList.toggle('expanded');
   detail.classList.toggle('visible');
+}
+function toggleBcDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('bc-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+  event.stopPropagation();
 }
 </script>
 </body></html>`))
@@ -575,8 +709,10 @@ func main() {
 	loadCharacters()
 	loadSoulBreaks()
 	loadHeroAbilities()
+	loadBurstCommands()
 	loadStatuses()
 	matchSoulBreakEffects()
+	matchBurstCommands()
 
 	log.Println("Caching images...")
 	cacheAllImages()
