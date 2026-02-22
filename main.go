@@ -236,12 +236,7 @@ func matchBurstCommands() {
 				matched := make([]BurstCommand, len(cmds))
 				copy(matched, cmds)
 				for j := range matched {
-					matches := bracketRe.FindAllStringSubmatch(matched[j].Effects, -1)
-					for _, m := range matches {
-						if se, ok := lookupStatus(m[1]); ok {
-							matched[j].MatchedEffects = append(matched[j].MatchedEffects, se)
-						}
-					}
+					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
 				}
 				sbList[i].BurstCommands = matched
 			}
@@ -269,6 +264,7 @@ func loadStatuses() {
 
 var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
 var pctRe = regexp.MustCompile(`([+-])\d+%`)
+var forSecRe = regexp.MustCompile(`for (\d+(?:\.\d+)?) seconds`)
 
 func lookupStatus(term string) (StatusEffect, bool) {
 	// Try exact match first
@@ -294,15 +290,39 @@ func lookupStatus(term string) (StatusEffect, bool) {
 	return StatusEffect{}, false
 }
 
+// matchEffectsInText extracts bracketed status effects from text, inferring
+// duration from the next "for N seconds" that follows each bracket when the
+// status has no default duration.
+func matchEffectsInText(text string) []StatusEffect {
+	bracketLocs := bracketRe.FindAllStringSubmatchIndex(text, -1)
+	durLocs := forSecRe.FindAllStringSubmatchIndex(text, -1)
+
+	var results []StatusEffect
+	for _, bloc := range bracketLocs {
+		term := text[bloc[2]:bloc[3]]
+		se, ok := lookupStatus(term)
+		if !ok {
+			continue
+		}
+		if se.Duration == "" || se.Duration == "-" {
+			// Find the first "for N seconds" whose start is after this bracket's end
+			bracketEnd := bloc[1]
+			for _, dloc := range durLocs {
+				if dloc[0] >= bracketEnd {
+					se.Duration = text[dloc[2]:dloc[3]] + " seconds"
+					break
+				}
+			}
+		}
+		results = append(results, se)
+	}
+	return results
+}
+
 func matchSoulBreakEffects() {
 	for name, sbList := range soulBreaks {
 		for i := range sbList {
-			matches := bracketRe.FindAllStringSubmatch(sbList[i].Effects, -1)
-			for _, m := range matches {
-				if se, ok := lookupStatus(m[1]); ok {
-					sbList[i].MatchedEffects = append(sbList[i].MatchedEffects, se)
-				}
-			}
+			sbList[i].MatchedEffects = matchEffectsInText(sbList[i].Effects)
 		}
 		soulBreaks[name] = sbList
 	}
