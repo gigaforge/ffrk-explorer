@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"strconv"
 	"strings"
 )
@@ -240,6 +241,14 @@ func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
 	return servePath
 }
 
+type imageJob struct {
+	dir       string
+	urlPath   string
+	remoteFmt string
+	id        string
+	result    *string // pointer to the Img field to update
+}
+
 func cacheAllImages() {
 	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks"}
 	for _, d := range dirs {
@@ -252,33 +261,54 @@ func cacheAllImages() {
 		sbFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/soulstrike/%s/%s_256.png"
 	)
 
+	// Collect all jobs
+	var jobs []imageJob
+
 	for i := range characters {
-		if img := ensureCachedImage("images/characters", "images/characters", charFmt, characters[i].ID); img != "" {
-			characters[i].Img = img
-		}
+		jobs = append(jobs, imageJob{"images/characters", "images/characters", charFmt, characters[i].ID, &characters[i].Img})
 	}
 
-	for name, haList := range heroAbilities {
+	for name := range heroAbilities {
+		haList := heroAbilities[name]
 		for i := range haList {
 			if haList[i].ID != "" {
-				if img := ensureCachedImage("images/hero_abilities", "images/hero_abilities", abilityFmt, haList[i].ID); img != "" {
-					haList[i].Img = img
-				}
+				jobs = append(jobs, imageJob{"images/hero_abilities", "images/hero_abilities", abilityFmt, haList[i].ID, &haList[i].Img})
 			}
 		}
 		heroAbilities[name] = haList
 	}
 
-	for name, sbList := range soulBreaks {
+	for name := range soulBreaks {
+		sbList := soulBreaks[name]
 		for i := range sbList {
 			if sbList[i].ID != "" {
-				if img := ensureCachedImage("images/soulbreaks", "images/soulbreaks", sbFmt, sbList[i].ID); img != "" {
-					sbList[i].Img = img
-				}
+				jobs = append(jobs, imageJob{"images/soulbreaks", "images/soulbreaks", sbFmt, sbList[i].ID, &sbList[i].Img})
 			}
 		}
 		soulBreaks[name] = sbList
 	}
+
+	// Process with 20 parallel workers
+	var wg sync.WaitGroup
+	ch := make(chan imageJob)
+
+	for w := 0; w < 20; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range ch {
+				if img := ensureCachedImage(job.dir, job.urlPath, job.remoteFmt, job.id); img != "" {
+					*job.result = img
+				}
+			}
+		}()
+	}
+
+	for _, job := range jobs {
+		ch <- job
+	}
+	close(ch)
+	wg.Wait()
 }
 
 // ---------- templates ----------
