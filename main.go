@@ -207,17 +207,16 @@ func buildRealmGroups() {
 
 // ---------- image caching ----------
 
-const (
-	imageDir       = "images/characters"
-	remoteImageFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/buddy/%s/%s.png"
-)
-
-func ensureCharacterImage(id string) string {
-	localPath := filepath.Join(imageDir, id+".png")
+// ensureCachedImage checks for a local copy at dir/<id>.png; if missing it
+// downloads from remoteFmt (which should contain two %s placeholders for the ID).
+// Returns the URL path to serve the image, or "" on failure.
+func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
+	localPath := filepath.Join(dir, id+".png")
+	servePath := "/" + urlPath + "/" + id + ".png"
 	if _, err := os.Stat(localPath); err == nil {
-		return "/images/characters/" + id + ".png"
+		return servePath
 	}
-	url := fmt.Sprintf(remoteImageFmt, id, id)
+	url := fmt.Sprintf(remoteFmt, id, id)
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("fetch image %s: %v", id, err)
@@ -238,16 +237,47 @@ func ensureCharacterImage(id string) string {
 		log.Printf("write image %s: %v", localPath, err)
 		return ""
 	}
-	log.Printf("cached image for character %s", id)
-	return "/images/characters/" + id + ".png"
+	return servePath
 }
 
-func cacheAllCharacterImages() {
-	os.MkdirAll(imageDir, 0o755)
+func cacheAllImages() {
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks"}
+	for _, d := range dirs {
+		os.MkdirAll(d, 0o755)
+	}
+
+	const (
+		charFmt    = "https://dff.sp.mbga.jp/dff/static/lang/image/buddy/%s/%s.png"
+		abilityFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_256.png"
+		sbFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/soulstrike/%s/%s_256.png"
+	)
+
 	for i := range characters {
-		if img := ensureCharacterImage(characters[i].ID); img != "" {
+		if img := ensureCachedImage("images/characters", "images/characters", charFmt, characters[i].ID); img != "" {
 			characters[i].Img = img
 		}
+	}
+
+	for name, haList := range heroAbilities {
+		for i := range haList {
+			if haList[i].ID != "" {
+				if img := ensureCachedImage("images/hero_abilities", "images/hero_abilities", abilityFmt, haList[i].ID); img != "" {
+					haList[i].Img = img
+				}
+			}
+		}
+		heroAbilities[name] = haList
+	}
+
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			if sbList[i].ID != "" {
+				if img := ensureCachedImage("images/soulbreaks", "images/soulbreaks", sbFmt, sbList[i].ID); img != "" {
+					sbList[i].Img = img
+				}
+			}
+		}
+		soulBreaks[name] = sbList
 	}
 }
 
@@ -408,8 +438,8 @@ func main() {
 	loadSoulBreaks()
 	loadHeroAbilities()
 
-	log.Println("Caching character images...")
-	cacheAllCharacterImages()
+	log.Println("Caching images...")
+	cacheAllImages()
 
 	buildRealmGroups()
 	log.Printf("Loaded %d characters", len(characters))
