@@ -407,7 +407,7 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
 .char-card .placeholder { width: 64px; height: 64px; background: #0f3460; border-radius: 50%;
                           display: flex; align-items: center; justify-content: center;
                           margin: 0 auto 4px; font-size: 24px; color: #e94560; }
-.char-card .name { font-size: 11px; line-height: 1.2; word-wrap: break-word; }
+.char-card .name { font-size: 14px; line-height: 1.3; word-wrap: break-word; }
 </style>
 </head><body>
 <h1>FFRK Community Database</h1>
