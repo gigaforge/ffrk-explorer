@@ -2304,7 +2304,9 @@ a { color: #e94560; }
 h1 { color: #e94560; margin-bottom: 16px; }
 h2 { color: #0f3460; background: #e94560; display: inline-block;
      padding: 4px 16px; border-radius: 4px; margin: 20px 0 12px; font-size: 1em; }
-.char-header { display: flex; align-items: center; gap: 12px; margin: 24px 0 8px; }
+.char-header { display: flex; align-items: center; gap: 12px; margin: 24px 0 8px; cursor: pointer; }
+.char-collapse { color: #e94560; font-size: 0.9em; }
+.char-content.collapsed { display: none; }
 .char-header img { width: 48px; height: 48px; object-fit: contain; }
 .char-header .name { color: #e94560; font-size: 1.2em; font-weight: bold; }
 .char-header .realm { color: #888; font-size: 0.9em; margin-left: 8px; }
@@ -2360,11 +2362,14 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 <h1>Search Results</h1>
 {{if .Truncated}}<div class="warning">Results truncated to {{.MaxResults}} items. Try narrowing your search.</div>{{end}}
 {{if not .Results}}<div class="no-results">No results found.</div>{{end}}
+{{if .Results}}<div style="margin: 12px 0;"><button onclick="collapseAll()" style="margin-right:8px;padding:4px 12px;background:#0f3460;color:#e0e0e0;border:1px solid #e94560;border-radius:4px;cursor:pointer;">Collapse All</button><button onclick="expandAll()" style="padding:4px 12px;background:#0f3460;color:#e0e0e0;border:1px solid #e94560;border-radius:4px;cursor:pointer;">Expand All</button></div>{{end}}
 {{range .Results}}
-<div class="char-header">
+<div class="char-header" onclick="toggleCharContent(this)">
+  <span class="char-collapse">&#9660;</span>
   {{if .Character.Img}}<img src="{{.Character.Img}}" alt="{{.Character.Name}}">{{end}}
-  <div><a href="/char/{{.Character.ID}}" class="name">{{.Character.Name}}</a><span class="realm">{{.Character.Realm}}</span></div>
+  <div><a href="/char/{{.Character.ID}}" class="name" onclick="event.stopPropagation()">{{.Character.Name}}</a><span class="realm">{{.Character.Realm}}</span></div>
 </div>
+<div class="char-content">
 
 {{if .HeroAbilities}}
 <table>
@@ -2622,10 +2627,26 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 {{end}}
 </table>
 {{end}}
+</div>
 
 {{end}}
 
 <script>
+function toggleCharContent(header) {
+  var content = header.nextElementSibling;
+  if (!content || !content.classList.contains('char-content')) return;
+  content.classList.toggle('collapsed');
+  var chevron = header.querySelector('.char-collapse');
+  if (chevron) chevron.innerHTML = content.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
+}
+function collapseAll() {
+  document.querySelectorAll('.char-content').forEach(function(el) { el.classList.add('collapsed'); });
+  document.querySelectorAll('.char-collapse').forEach(function(el) { el.innerHTML = '&#9654;'; });
+}
+function expandAll() {
+  document.querySelectorAll('.char-content').forEach(function(el) { el.classList.remove('collapsed'); });
+  document.querySelectorAll('.char-collapse').forEach(function(el) { el.innerHTML = '&#9660;'; });
+}
 function toggleDetail(row) {
   var detail = row.nextElementSibling;
   if (!detail || !detail.classList.contains('sb-detail')) return;
@@ -3036,7 +3057,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	var results []SearchResult
 	totalCount := 0
 	truncated := false
-	const maxResults = 300
+	const maxResults = 500
 
 	for _, c := range matchedChars {
 		if truncated {
