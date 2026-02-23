@@ -61,6 +61,19 @@ type SynchroAbility struct {
 	MatchedEffects []StatusEffect
 }
 
+type ZenithAbility struct {
+	Img            string
+	Name           string
+	Type           string
+	Target         string
+	Element        string
+	Time           string
+	Effects        string
+	School         string
+	ID             string
+	MatchedEffects []StatusEffect
+}
+
 type SoulBreak struct {
 	Character        string
 	Img              string
@@ -75,6 +88,7 @@ type SoulBreak struct {
 	MatchedEffects   []StatusEffect
 	BurstCommands    []BurstCommand
 	SynchroAbilities []SynchroAbility
+	ZenithAbilities  []ZenithAbility
 }
 
 type HeroAbility struct {
@@ -109,6 +123,7 @@ var (
 	heroAbilities map[string][]HeroAbility // keyed by character name
 	burstCommands    map[string][]BurstCommand    // keyed by "Character|Source"
 	synchroAbilities map[string][]SynchroAbility  // keyed by "Character|Source"
+	zenithAbilities  map[string][]ZenithAbility   // keyed by "Character|Source"
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
@@ -312,6 +327,46 @@ func matchSynchroAbilities() {
 	}
 }
 
+func loadZenithAbilities() {
+	zenithAbilities = make(map[string][]ZenithAbility)
+	rows := mustReadCSV("Zenith-SB-Abilities.csv")
+	for _, row := range rows {
+		za := ZenithAbility{
+			Name:    row["Name"],
+			Type:    row["Type"],
+			Target:  row["Target"],
+			Element: row["Element"],
+			Time:    row["Time"],
+			Effects: row["Effects"],
+			School:  row["School"],
+			ID:      row["ID"],
+		}
+		key := row["Character"] + "|" + row["Source"]
+		zenithAbilities[key] = append(zenithAbilities[key], za)
+	}
+	log.Printf("Loaded %d zenith ability groups", len(zenithAbilities))
+}
+
+func matchZenithAbilities() {
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			if sbList[i].Tier != "ZSB" {
+				continue
+			}
+			key := sbList[i].Character + "|" + sbList[i].Name
+			if abs, ok := zenithAbilities[key]; ok {
+				matched := make([]ZenithAbility, len(abs))
+				copy(matched, abs)
+				for j := range matched {
+					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
+				}
+				sbList[i].ZenithAbilities = matched
+			}
+		}
+		soulBreaks[name] = sbList
+	}
+}
+
 func loadStatuses() {
 	statusEffects = make(map[string]StatusEffect)
 	rows := mustReadCSV("Status.csv")
@@ -477,7 +532,7 @@ type imageJob struct {
 }
 
 func cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith"}
 	for _, d := range dirs {
 		os.MkdirAll(d, 0o755)
 	}
@@ -521,6 +576,11 @@ func cacheAllImages() {
 			for j := range sbList[i].SynchroAbilities {
 				if sbList[i].SynchroAbilities[j].ConditionID != "" {
 					jobs = append(jobs, imageJob{"images/synchro", "images/synchro", synchroFmt, sbList[i].SynchroAbilities[j].ConditionID, &sbList[i].SynchroAbilities[j].Img})
+				}
+			}
+			for j := range sbList[i].ZenithAbilities {
+				if sbList[i].ZenithAbilities[j].ID != "" {
+					jobs = append(jobs, imageJob{"images/zenith", "images/zenith", burstFmt, sbList[i].ZenithAbilities[j].ID, &sbList[i].ZenithAbilities[j].Img})
 				}
 			}
 		}
@@ -690,8 +750,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 <table>
 <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities}} expandable{{end}}" onclick="toggleDetail(this)">
-  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities}}<span class="chevron">&#9654;</span>{{end}}</td>
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -700,9 +760,45 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if or .MatchedEffects .BurstCommands .SynchroAbilities}}
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}}
 <tr class="sb-detail">
   <td colspan="8">
+    {{if .ZenithAbilities}}
+    <div class="burst-commands">
+      <div class="burst-title">Zenith SB Abilities</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .ZenithAbilities}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="9">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
     {{if .SynchroAbilities}}
     <div class="burst-commands">
       <div class="burst-title">Synchro Abilities</div>
@@ -846,10 +942,12 @@ func main() {
 	loadHeroAbilities()
 	loadBurstCommands()
 	loadSynchroAbilities()
+	loadZenithAbilities()
 	loadStatuses()
 	matchSoulBreakEffects()
 	matchBurstCommands()
 	matchSynchroAbilities()
+	matchZenithAbilities()
 
 	log.Println("Caching images...")
 	cacheAllImages()
