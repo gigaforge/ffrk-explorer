@@ -1018,6 +1018,7 @@ func initUserData() {
 	if _, err := os.Stat(usersJSON); err == nil {
 		loadUsersJSON(usersJSON)
 		loadAllUserSoulbreaks()
+		loadSessions()
 		return
 	}
 
@@ -1026,10 +1027,12 @@ func initUserData() {
 		importUsersFromCSV()
 		saveUsersJSON(usersJSON)
 		saveAllUserSoulbreaks()
+		loadSessions()
 		return
 	}
 
 	log.Println("No user data found, starting fresh")
+	loadSessions()
 }
 
 func loadUsersJSON(path string) {
@@ -1092,6 +1095,39 @@ func loadAllUserSoulbreaks() {
 		total += len(ids)
 	}
 	log.Printf("Loaded %d user soulbreak records from %s/", total, soulbreaksDir)
+}
+
+const sessionsFile = "data/sessions.json"
+
+func loadSessions() {
+	data, err := os.ReadFile(sessionsFile)
+	if err != nil {
+		return
+	}
+	var raw map[string]int
+	if err := json.Unmarshal(data, &raw); err != nil {
+		log.Printf("WARNING: could not parse %s: %v", sessionsFile, err)
+		return
+	}
+	loaded := 0
+	for token, uid := range raw {
+		if _, ok := users[uid]; ok {
+			sessions[token] = uid
+			loaded++
+		}
+	}
+	log.Printf("Loaded %d sessions from %s", loaded, sessionsFile)
+}
+
+func saveSessions() {
+	data, err := json.Marshal(sessions)
+	if err != nil {
+		log.Printf("WARNING: could not marshal sessions: %v", err)
+		return
+	}
+	if err := os.WriteFile(sessionsFile, data, 0o644); err != nil {
+		log.Printf("WARNING: could not write %s: %v", sessionsFile, err)
+	}
 }
 
 func saveUsersJSON(path string) {
@@ -1238,6 +1274,7 @@ func createSession(w http.ResponseWriter, userID int) {
 	token := generateSessionToken()
 	userLock.Lock()
 	sessions[token] = userID
+	saveSessions()
 	userLock.Unlock()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -1385,6 +1422,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		userLock.Lock()
 		delete(sessions, cookie.Value)
+		saveSessions()
 		userLock.Unlock()
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -1516,6 +1554,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 
 	if updates > 0 {
 		saveUserSoulbreaksForUser(u.ID)
+		log.Printf("%s updated with %d new soulbreaks via FFRK-LabMem-SBTracker.", u.Username, updates)
 		fmt.Fprintf(w, "Added %d new Soulbreaks to your account at https://ffrk.gigaforge.com", updates)
 	} else {
 		fmt.Fprint(w, "No new soulbreaks to add")
