@@ -871,6 +871,12 @@ const searchBarHTML = `
     <h3>Additional Effects</h3>
     <div class="modal-columns">
       <div class="modal-col">
+        <label><input type="checkbox" value="aegis_counter"> Aegis Counter</label>
+        <label><input type="checkbox" value="fullbreak_counter"> Fullbreak Counter</label>
+        <label><input type="checkbox" value="phys_job_break_counter"> Phys Job Break Counter</label>
+        <label><input type="checkbox" value="mag_job_break_counter"> Mag Job Break Counter</label>
+      </div>
+      <div class="modal-col">
         <label><input type="checkbox" value="haste"> Haste</label>
         <label><input type="checkbox" value="protect"> Protect</label>
         <label><input type="checkbox" value="shell"> Shell</label>
@@ -1740,9 +1746,25 @@ var critChanceRe = regexp.MustCompile(`\d+% Critical[\]\s\d]`)
 var critDamageRe = regexp.MustCompile(`Critical Damage \+\d+%`)
 var sbGaugeRe = regexp.MustCompile(`Soul Break Gauge \+`)
 var atbSpeedRe = regexp.MustCompile(`\d+% ATB`)
+var aegisCounterRe = regexp.MustCompile(`DEF, RES and MND -\d+%`)
+var fullbreakCounterRe = regexp.MustCompile(`ATK, DEF, MAG and RES \+\d+%`)
+var physJobBreakCounterRe = regexp.MustCompile(`ATK and MND \+\d+%, DEF and RES \+\d+%`)
+var magJobBreakCounterRe = regexp.MustCompile(`MAG and MND \+\d+%, DEF and RES \+\d+%`)
 
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
+	"aegis_counter": func(text string) bool {
+		return aegisCounterRe.MatchString(text)
+	},
+	"fullbreak_counter": func(text string) bool {
+		return fullbreakCounterRe.MatchString(text)
+	},
+	"phys_job_break_counter": func(text string) bool {
+		return physJobBreakCounterRe.MatchString(text)
+	},
+	"mag_job_break_counter": func(text string) bool {
+		return magJobBreakCounterRe.MatchString(text)
+	},
 	"haste": func(text string) bool {
 		return strings.Contains(text, "[Haste]") || strings.Contains(text, "Haste]")
 	},
