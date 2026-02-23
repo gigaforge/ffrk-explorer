@@ -3017,7 +3017,10 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Collect matching hero abilities (skip if only SB-specific filters are active)
+		// Collect hero abilities:
+		// - No SB filters: include all HAs for the character
+		// - SB filters active: only include HAs that match effect filters,
+		//   and only if the character also has matching soul breaks
 		var matchedHAs []HeroAbility
 		if !truncated && !hasSBFilter {
 			for _, ha := range heroAbilities[c.Name] {
@@ -3028,7 +3031,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
-		} else if !truncated && hasEffectFilter {
+		} else if !truncated && len(matchedSBs) > 0 && hasEffectFilter {
 			for _, ha := range heroAbilities[c.Name] {
 				match := false
 				if elementFilter != "" && textContainsAttach(ha.Effects, elementFilter) {
