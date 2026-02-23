@@ -1973,7 +1973,7 @@ var funcMap = template.FuncMap{
 var indexTmpl = template.Must(template.New("index").Funcs(funcMap).Parse(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
-<title>FFRK Community Database</title>
+<title>FFRK Soul Break Tracker &amp; Search - Powered by FFRK Community Database</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -1996,7 +1996,7 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
 </style>
 </head><body>
 ` + searchBarHTML + `
-<h1>FFRK Community Database</h1>
+<h1 style="line-height:0.9">FFRK Soul Break Tracker &amp; Search<br><span style="font-size:0.5em;font-weight:normal">Made by trgKai / GigaForge Games</span></h1>
 {{range .}}
 <div class="realm-section">
   <h2>{{.Realm}}</h2>
@@ -2016,7 +2016,7 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
 var charTmpl = template.Must(template.New("char").Funcs(funcMap).Parse(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
-<title>{{.Character.Name}} - FFRK</title>
+<title>{{.Character.Name}} - FFRK Soul Break Tracker &amp; Search</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -2392,7 +2392,7 @@ type SearchData struct {
 var searchTmpl = template.Must(template.New("search").Funcs(funcMap).Parse(`<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
-<title>Search - FFRK</title>
+<title>Search - FFRK Soul Break Tracker &amp; Search</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
