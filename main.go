@@ -387,6 +387,9 @@ func loadCharacters() {
 			if v != "" {
 				n, err := strconv.Atoi(v)
 				if err == nil && n > 0 {
+					if n == 5 {
+						n = 6
+					}
 					c.Schools[s] = n
 				}
 			}
