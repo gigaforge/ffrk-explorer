@@ -89,6 +89,7 @@ type SoulBreak struct {
 	BurstCommands    []BurstCommand
 	SynchroAbilities []SynchroAbility
 	ZenithAbilities  []ZenithAbility
+	DualShift        *SoulBreak
 }
 
 type HeroAbility struct {
@@ -450,6 +451,38 @@ func matchSoulBreakEffects() {
 	}
 }
 
+func pairDualShifts() {
+	for name, sbList := range soulBreaks {
+		// Index primary DASBs by "SBVer" for this character
+		primaries := make(map[string]int) // SBVer -> index in sbList
+		for i, sb := range sbList {
+			if sb.Tier == "DASB" && !strings.HasSuffix(sb.Name, "(Dual Shift)") {
+				primaries[sb.SBVer] = i
+			}
+		}
+		// Match Dual Shift entries to their primaries
+		remove := make(map[int]bool)
+		for i, sb := range sbList {
+			if sb.Tier == "DASB" && strings.HasSuffix(sb.Name, "(Dual Shift)") {
+				if pi, ok := primaries[sb.SBVer]; ok {
+					ds := sb
+					sbList[pi].DualShift = &ds
+					remove[i] = true
+				}
+			}
+		}
+		if len(remove) > 0 {
+			var filtered []SoulBreak
+			for i, sb := range sbList {
+				if !remove[i] {
+					filtered = append(filtered, sb)
+				}
+			}
+			soulBreaks[name] = filtered
+		}
+	}
+}
+
 // Preferred realm display order (roughly follows mainline game numbering)
 var realmOrder = map[string]int{
 	"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6,
@@ -750,8 +783,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 <table>
 <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}} expandable{{end}}" onclick="toggleDetail(this)">
-  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}}<span class="chevron">&#9654;</span>{{end}}</td>
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -760,9 +793,39 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities}}
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}}
 <tr class="sb-detail">
   <td colspan="8">
+    {{if .DualShift}}
+    <div class="burst-commands">
+      <div class="burst-title">Dual Shift</div>
+      <table class="burst-table">
+        <tr><th></th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        <tr class="bc-row{{if .DualShift.MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .DualShift.MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{.DualShift.Type}}</td>
+          <td>{{.DualShift.Element}}</td>
+          <td>{{.DualShift.Time}}</td>
+          <td class="effects">{{.DualShift.Effects}}</td>
+        </tr>
+        {{if .DualShift.MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="5">
+            <ul class="effect-list">
+            {{range .DualShift.MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+      </table>
+    </div>
+    {{end}}
     {{if .ZenithAbilities}}
     <div class="burst-commands">
       <div class="burst-title">Zenith SB Abilities</div>
@@ -945,6 +1008,7 @@ func main() {
 	loadZenithAbilities()
 	loadStatuses()
 	matchSoulBreakEffects()
+	pairDualShifts()
 	matchBurstCommands()
 	matchSynchroAbilities()
 	matchZenithAbilities()
