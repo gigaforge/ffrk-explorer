@@ -181,6 +181,7 @@ type User struct {
 var (
 	users          map[int]*User          // id → user
 	usersByName    map[string]*User       // lowercase username → user
+	usersByAPI     map[string]*User       // api_key → user
 	userSoulbreaks map[int]map[string]bool // user_id → set of soulbreak IDs
 	sessions       map[string]int          // session_token → user_id
 	userLock       sync.RWMutex
@@ -1003,6 +1004,7 @@ const soulbreaksDir = "data/soulbreaks"
 func initUserData() {
 	users = make(map[int]*User)
 	usersByName = make(map[string]*User)
+	usersByAPI = make(map[string]*User)
 	userSoulbreaks = make(map[int]map[string]bool)
 	sessions = make(map[string]int)
 	nextUserID = 1
@@ -1045,6 +1047,9 @@ func loadUsersJSON(path string) {
 		u := &userList[i]
 		users[u.ID] = u
 		usersByName[strings.ToLower(u.Username)] = u
+		if u.APIKey != "" {
+			usersByAPI[u.APIKey] = u
+		}
 		if u.ID >= nextUserID {
 			nextUserID = u.ID + 1
 		}
@@ -1166,6 +1171,9 @@ func importUsersFromCSV() {
 		}
 		users[u.ID] = u
 		usersByName[strings.ToLower(u.Username)] = u
+		if u.APIKey != "" {
+			usersByAPI[u.APIKey] = u
+		}
 		if u.ID >= nextUserID {
 			nextUserID = u.ID + 1
 		}
@@ -1359,6 +1367,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	nextUserID++
 	users[u.ID] = u
 	usersByName[strings.ToLower(u.Username)] = u
+	usersByAPI[u.APIKey] = u
 	userLock.Unlock()
 
 	saveUsersJSON("data/users.json")
@@ -1467,6 +1476,49 @@ func userSoulbreaksHandler(w http.ResponseWriter, r *http.Request) {
 		userSoulbreaksPostHandler(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func syncHandler(w http.ResponseWriter, r *http.Request) {
+	apiKey := r.FormValue("api_key")
+	sbList := r.FormValue("sb_list")
+	if apiKey == "" || sbList == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "Missing api_key or sb_list")
+		return
+	}
+
+	userLock.Lock()
+	u := usersByAPI[apiKey]
+	if u == nil {
+		userLock.Unlock()
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Invalid API key")
+		return
+	}
+
+	if userSoulbreaks[u.ID] == nil {
+		userSoulbreaks[u.ID] = make(map[string]bool)
+	}
+
+	updates := 0
+	for _, sb := range strings.Split(sbList, ",") {
+		sb = strings.TrimSpace(sb)
+		if sb == "" {
+			continue
+		}
+		if !userSoulbreaks[u.ID][sb] {
+			userSoulbreaks[u.ID][sb] = true
+			updates++
+		}
+	}
+	userLock.Unlock()
+
+	if updates > 0 {
+		saveUserSoulbreaksForUser(u.ID)
+		fmt.Fprintf(w, "Added %d new Soulbreaks to your account at https://ffrk.gigaforge.com", updates)
+	} else {
+		fmt.Fprint(w, "No new soulbreaks to add")
 	}
 }
 
@@ -3151,6 +3203,7 @@ func main() {
 	http.HandleFunc("/api/logout", logoutHandler)
 	http.HandleFunc("/api/me", meHandler)
 	http.HandleFunc("/api/user/soulbreaks", userSoulbreaksHandler)
+	http.HandleFunc("/ffrk_sync.php", syncHandler)
 
 	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)
