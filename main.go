@@ -45,19 +45,36 @@ type BurstCommand struct {
 	MatchedEffects []StatusEffect
 }
 
-type SoulBreak struct {
-	Character      string
+type SynchroAbility struct {
 	Img            string
 	Name           string
-	Tier           string
-	SBVer          string
+	Slot           string
+	Condition      string
 	Type           string
+	Target         string
 	Element        string
 	Time           string
 	Effects        string
+	School         string
 	ID             string
+	ConditionID    string
 	MatchedEffects []StatusEffect
-	BurstCommands  []BurstCommand
+}
+
+type SoulBreak struct {
+	Character        string
+	Img              string
+	Name             string
+	Tier             string
+	SBVer            string
+	Type             string
+	Element          string
+	Time             string
+	Effects          string
+	ID               string
+	MatchedEffects   []StatusEffect
+	BurstCommands    []BurstCommand
+	SynchroAbilities []SynchroAbility
 }
 
 type HeroAbility struct {
@@ -90,7 +107,8 @@ var (
 	characters    []Character
 	soulBreaks    map[string][]SoulBreak  // keyed by character name
 	heroAbilities map[string][]HeroAbility // keyed by character name
-	burstCommands map[string][]BurstCommand // keyed by "Character|Source"
+	burstCommands    map[string][]BurstCommand    // keyed by "Character|Source"
+	synchroAbilities map[string][]SynchroAbility  // keyed by "Character|Source"
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
@@ -245,6 +263,55 @@ func matchBurstCommands() {
 	}
 }
 
+func loadSynchroAbilities() {
+	synchroAbilities = make(map[string][]SynchroAbility)
+	rows := mustReadCSV("Synchro.csv")
+	for _, row := range rows {
+		sa := SynchroAbility{
+			Name:      row["Name"],
+			Slot:      row["Synchro Ability Slot"],
+			Condition: row["Synchro Condition"],
+			Type:      row["Type"],
+			Target:    row["Target"],
+			Element:   row["Element"],
+			Time:      row["Time"],
+			Effects:   row["Effects"],
+			School:      row["School"],
+			ID:          row["ID"],
+			ConditionID: row["Synchro Condition ID"],
+		}
+		key := row["Character"] + "|" + row["Source"]
+		synchroAbilities[key] = append(synchroAbilities[key], sa)
+	}
+	for key, abs := range synchroAbilities {
+		sort.Slice(abs, func(i, j int) bool {
+			return abs[i].Slot < abs[j].Slot
+		})
+		synchroAbilities[key] = abs
+	}
+	log.Printf("Loaded %d synchro ability groups", len(synchroAbilities))
+}
+
+func matchSynchroAbilities() {
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			if sbList[i].Tier != "SASB" {
+				continue
+			}
+			key := sbList[i].Character + "|" + sbList[i].Name
+			if abs, ok := synchroAbilities[key]; ok {
+				matched := make([]SynchroAbility, len(abs))
+				copy(matched, abs)
+				for j := range matched {
+					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
+				}
+				sbList[i].SynchroAbilities = matched
+			}
+		}
+		soulBreaks[name] = sbList
+	}
+}
+
 func loadStatuses() {
 	statusEffects = make(map[string]StatusEffect)
 	rows := mustReadCSV("Status.csv")
@@ -364,7 +431,7 @@ func buildRealmGroups() {
 // ---------- image caching ----------
 
 // ensureCachedImage checks for a local copy at dir/<id>.png; if missing it
-// downloads from remoteFmt (which should contain two %s placeholders for the ID).
+// downloads from remoteFmt (which should contain one or more %s placeholders for the ID).
 // Returns the URL path to serve the image, or "" on failure.
 func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
 	localPath := filepath.Join(dir, id+".png")
@@ -372,7 +439,12 @@ func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
 	if _, err := os.Stat(localPath); err == nil {
 		return servePath
 	}
-	url := fmt.Sprintf(remoteFmt, id, id)
+	n := strings.Count(remoteFmt, "%s")
+	args := make([]any, n)
+	for i := range args {
+		args[i] = id
+	}
+	url := fmt.Sprintf(remoteFmt, args...)
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Printf("fetch image %s: %v", id, err)
@@ -405,7 +477,7 @@ type imageJob struct {
 }
 
 func cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro"}
 	for _, d := range dirs {
 		os.MkdirAll(d, 0o755)
 	}
@@ -415,6 +487,7 @@ func cacheAllImages() {
 		abilityFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_256.png"
 		sbFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/soulstrike/%s/%s_256.png"
 		burstFmt   = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_128.png"
+		synchroFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/synchro/%s.png"
 	)
 
 	// Collect all jobs
@@ -443,6 +516,11 @@ func cacheAllImages() {
 			for j := range sbList[i].BurstCommands {
 				if sbList[i].BurstCommands[j].ID != "" {
 					jobs = append(jobs, imageJob{"images/burst", "images/burst", burstFmt, sbList[i].BurstCommands[j].ID, &sbList[i].BurstCommands[j].Img})
+				}
+			}
+			for j := range sbList[i].SynchroAbilities {
+				if sbList[i].SynchroAbilities[j].ConditionID != "" {
+					jobs = append(jobs, imageJob{"images/synchro", "images/synchro", synchroFmt, sbList[i].SynchroAbilities[j].ConditionID, &sbList[i].SynchroAbilities[j].Img})
 				}
 			}
 		}
@@ -612,8 +690,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 <table>
 <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if or .MatchedEffects .BurstCommands}} expandable{{end}}" onclick="toggleDetail(this)">
-  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands}}<span class="chevron">&#9654;</span>{{end}}</td>
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -622,9 +700,46 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if or .MatchedEffects .BurstCommands}}
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities}}
 <tr class="sb-detail">
   <td colspan="8">
+    {{if .SynchroAbilities}}
+    <div class="burst-commands">
+      <div class="burst-title">Synchro Abilities</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Condition</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .SynchroAbilities}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Condition}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="10">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
     {{if .BurstCommands}}
     <div class="burst-commands">
       <div class="burst-title">Burst Commands</div>
@@ -730,9 +845,11 @@ func main() {
 	loadSoulBreaks()
 	loadHeroAbilities()
 	loadBurstCommands()
+	loadSynchroAbilities()
 	loadStatuses()
 	matchSoulBreakEffects()
 	matchBurstCommands()
+	matchSynchroAbilities()
 
 	log.Println("Caching images...")
 	cacheAllImages()
