@@ -165,6 +165,7 @@ var (
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
+	tierNames     []string
 	dataLock      sync.RWMutex
 )
 
@@ -393,8 +394,31 @@ func loadCharacters() {
 	}
 }
 
+var invalidTiers = map[string]bool{
+	"Tier": true, "Default": true, "Shared": true, "Self": true,
+	"N": true,
+}
+
+func isValidTier(s string) bool {
+	if len(s) == 0 || len(s) > 10 || invalidTiers[s] {
+		return false
+	}
+	hasUpper := false
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			hasUpper = true
+		} else if (r >= 'a' && r <= 'z') || r == '+' {
+			continue
+		} else {
+			return false
+		}
+	}
+	return hasUpper
+}
+
 func loadSoulBreaks() {
 	soulBreaks = make(map[string][]SoulBreak)
+	tierSet := make(map[string]bool)
 	rows := mustReadCSV("Soul-Breaks.csv")
 	for _, row := range rows {
 		sb := SoulBreak{
@@ -410,7 +434,15 @@ func loadSoulBreaks() {
 			ID:        row["ID"],
 		}
 		soulBreaks[sb.Character] = append(soulBreaks[sb.Character], sb)
+		if isValidTier(sb.Tier) {
+			tierSet[sb.Tier] = true
+		}
 	}
+	tierNames = nil
+	for t := range tierSet {
+		tierNames = append(tierNames, t)
+	}
+	sort.Strings(tierNames)
 }
 
 func loadHeroAbilities() {
@@ -1519,11 +1551,6 @@ const searchBarHTML = `
   <label>SB Tier</label>
   <select id="tier-select">
     <option value="">Any</option>
-    <option>SB</option><option>SSB</option><option>BSB</option><option>OSB</option>
-    <option>USB</option><option>AOSB</option><option>CSB</option><option>CSB+</option>
-    <option>DASB</option><option>ADSB</option><option>SASB</option><option>ZSB</option>
-    <option>OZSB</option><option>Glint</option><option>Glint+</option><option>AASB</option>
-    <option>LBO</option><option>LBG</option><option>LBGS</option>
   </select>
   <label>En-Element</label>
   <select id="en-element-select">
@@ -1658,6 +1685,12 @@ fetch('/api/characters').then(r=>r.json()).then(names=>{
   var dl=document.getElementById('char-list');
   names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o)});
 });
+fetch('/api/tiers').then(r=>r.json()).then(tiers=>{
+  var sel=document.getElementById('tier-select');
+  tiers.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o)});
+  var p=new URLSearchParams(window.location.search);
+  if(p.get('tier'))sel.value=p.get('tier');
+});
 function openEffectsModal(){document.getElementById('effects-modal').classList.add('visible')}
 function closeEffectsModal(){document.getElementById('effects-modal').classList.remove('visible');updateBadge()}
 function clearEffects(){
@@ -1755,7 +1788,6 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
   var p=new URLSearchParams(window.location.search);
   if(p.get('character'))document.getElementById('char-input').value=p.get('character');
   if(p.get('realm'))document.getElementById('realm-select').value=p.get('realm');
-  if(p.get('tier'))document.getElementById('tier-select').value=p.get('tier');
   if(p.get('element'))document.getElementById('en-element-select').value=p.get('element');
   if(p.get('imperil'))document.getElementById('imperil-select').value=p.get('imperil');
   if(p.get('effects')){
@@ -2588,6 +2620,13 @@ func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(names)
 }
 
+func tierAPIHandler(w http.ResponseWriter, r *http.Request) {
+	dataLock.RLock()
+	defer dataLock.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tierNames)
+}
+
 // ---------- additional effect matching ----------
 
 // containsCI performs a case-insensitive substring check.
@@ -3103,6 +3142,7 @@ func main() {
 	http.HandleFunc("/char/", charHandler)
 	http.HandleFunc("/search", searchHandler)
 	http.HandleFunc("/api/characters", characterAPIHandler)
+	http.HandleFunc("/api/tiers", tierAPIHandler)
 	http.HandleFunc("/api/login", loginHandler)
 	http.HandleFunc("/api/register", registerHandler)
 	http.HandleFunc("/api/logout", logoutHandler)
