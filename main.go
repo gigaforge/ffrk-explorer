@@ -314,6 +314,7 @@ func reloadData() {
 	realmGroups = nil
 
 	loadCharacters()
+	applyRecordSphereUpgrades()
 	loadSoulBreaks()
 	loadHeroAbilities()
 	loadBurstCommands()
@@ -396,6 +397,50 @@ func loadCharacters() {
 		}
 		characters = append(characters, c)
 	}
+}
+
+var recordSphereUpgradeRE = regexp.MustCompile(`^(.+?)\s+(\d)★\s*->\s*(\d)★$`)
+
+func applyRecordSphereUpgrades() {
+	if _, err := os.Stat("Record-Spheres.csv"); err != nil {
+		return
+	}
+	rows := mustReadCSV("Record-Spheres.csv")
+
+	// Build name -> index lookup for characters
+	charIndex := make(map[string]int, len(characters))
+	for i := range characters {
+		charIndex[characters[i].Name] = i
+	}
+
+	lvCols := []string{"S. Lv 1", "S. Lv 2", "S. Lv 3", "S. Lv 4", "S. Lv 5"}
+	upgrades := 0
+
+	for _, row := range rows {
+		name := row["Character"]
+		ci, ok := charIndex[name]
+		if !ok {
+			continue
+		}
+		c := &characters[ci]
+		for _, col := range lvCols {
+			val := strings.TrimSpace(row[col])
+			m := recordSphereUpgradeRE.FindStringSubmatch(val)
+			if m == nil {
+				continue
+			}
+			school := m[1]
+			newLevel, _ := strconv.Atoi(m[3])
+			if newLevel == 5 {
+				newLevel = 6
+			}
+			if c.Schools[school] < newLevel {
+				c.Schools[school] = newLevel
+				upgrades++
+			}
+		}
+	}
+	log.Printf("Applied %d record sphere school upgrades", upgrades)
 }
 
 var invalidTiers = map[string]bool{
