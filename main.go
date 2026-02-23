@@ -1474,6 +1474,15 @@ const searchBarCSS = `
 .effects-badge { background: #0f3460; color: #e94560; border-radius: 10px; padding: 1px 7px;
                  font-size: 11px; margin-left: 4px; }
 #owned-filter { color: #e0e0e0; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.school-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 16px; }
+.school-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.school-row span { color: #e0e0e0; font-size: 13px; white-space: nowrap; }
+.school-row select { background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+                     border-radius: 4px; padding: 2px 4px; font-size: 12px; }
+.school-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #e0e0e0; font-size: 14px; }
+.school-toggle button { padding: 4px 12px; font-size: 12px; border: 1px solid #0f3460;
+                        border-radius: 4px; cursor: pointer; background: #1a1a2e; color: #e0e0e0; }
+.school-toggle button.active { background: #e94560; border-color: #e94560; color: #fff; }
 #owned-filter input[type="checkbox"] { accent-color: #e94560; cursor: pointer; }
 .search-bar .auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .search-bar .auth-area .welcome { color: #e0e0e0; font-size: 14px; }
@@ -1531,6 +1540,7 @@ const searchBarHTML = `
     <option>Poison</option><option>Prismatic</option>
   </select>
   <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="openSchoolsModal()">Job Requirements<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
   <button onclick="doSearch()">Search</button>
   <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only"> Owned only</label>
   <div class="auth-area" id="auth-area"></div>
@@ -1607,6 +1617,42 @@ const searchBarHTML = `
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="schools-modal">
+  <div class="modal">
+    <h3>Job Requirements</h3>
+    <div class="school-toggle">
+      <span>Match:</span>
+      <button id="school-mode-and" class="active" onclick="setSchoolMode('and')">ALL (AND)</button>
+      <button id="school-mode-or" onclick="setSchoolMode('or')">ANY (OR)</button>
+    </div>
+    <div class="school-grid">
+      <div class="school-row"><span>Black Magic</span><select data-school="Black Magic"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>White Magic</span><select data-school="White Magic"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Combat</span><select data-school="Combat"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Support</span><select data-school="Support"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Celerity</span><select data-school="Celerity"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Summoning</span><select data-school="Summoning"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Spellblade</span><select data-school="Spellblade"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Dragoon</span><select data-school="Dragoon"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Monk</span><select data-school="Monk"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Thief</span><select data-school="Thief"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Knight</span><select data-school="Knight"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Samurai</span><select data-school="Samurai"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Ninja</span><select data-school="Ninja"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Bard</span><select data-school="Bard"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Dancer</span><select data-school="Dancer"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Machinist</span><select data-school="Machinist"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Darkness</span><select data-school="Darkness"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Sharpshooter</span><select data-school="Sharpshooter"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Witch</span><select data-school="Witch"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Heavy</span><select data-school="Heavy"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+    </div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="clearSchools()">Clear All</button>
+      <button onclick="closeSchoolsModal()">Done</button>
+    </div>
+  </div>
+</div>
 <script>
 fetch('/api/characters').then(r=>r.json()).then(names=>{
   var dl=document.getElementById('char-list');
@@ -1632,6 +1678,35 @@ function updateBadge(){
 document.getElementById('effects-modal').addEventListener('click',function(e){
   if(e.target===this)closeEffectsModal();
 });
+var schoolMode='and';
+function openSchoolsModal(){document.getElementById('schools-modal').classList.add('visible')}
+function closeSchoolsModal(){document.getElementById('schools-modal').classList.remove('visible');updateSchoolsBadge()}
+function clearSchools(){
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){s.value=''});
+  updateSchoolsBadge();
+}
+function setSchoolMode(mode){
+  schoolMode=mode;
+  document.getElementById('school-mode-and').classList.toggle('active',mode==='and');
+  document.getElementById('school-mode-or').classList.toggle('active',mode==='or');
+}
+function getSchoolFilters(){
+  var parts=[];
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){
+    if(s.value){parts.push(s.getAttribute('data-school')+':'+s.value)}
+  });
+  return parts.join(',');
+}
+function updateSchoolsBadge(){
+  var count=0;
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){if(s.value)count++});
+  var badge=document.getElementById('schools-badge');
+  if(count>0){badge.textContent=count;badge.style.display='inline'}
+  else{badge.style.display='none'}
+}
+document.getElementById('schools-modal').addEventListener('click',function(e){
+  if(e.target===this)closeSchoolsModal();
+});
 function doSearch(){
   var p=new URLSearchParams();
   var c=document.getElementById('char-input').value;if(c)p.set('character',c);
@@ -1640,6 +1715,8 @@ function doSearch(){
   var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
   var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
   var eff=getCheckedEffects();if(eff.length>0)p.set('effects',eff.join(','));
+  var sch=getSchoolFilters();if(sch)p.set('schools',sch);
+  if(schoolMode!=='and')p.set('schoolmode',schoolMode);
   if(document.getElementById('owned-only').checked)p.set('owned','1');
   window.location='/search?'+p.toString();
 }
@@ -1690,6 +1767,16 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
     updateBadge();
   }
   if(p.get('owned')==='1')document.getElementById('owned-only').checked=true;
+  if(p.get('schools')){
+    p.get('schools').split(',').forEach(function(pair){
+      var parts=pair.split(':');if(parts.length===2){
+        var sel=document.querySelector('#schools-modal select[data-school="'+parts[0]+'"]');
+        if(sel)sel.value=parts[1];
+      }
+    });
+    updateSchoolsBadge();
+  }
+  if(p.get('schoolmode')==='or')setSchoolMode('or');
 })();
 </script>
 `
@@ -2109,11 +2196,13 @@ type SearchData struct {
 	LoggedIn        bool
 	OwnedSoulbreaks map[string]bool
 	Query           struct {
-		Character string
-		Realm     string
-		Tier      string
-		Element   string
-		Imperil   string
+		Character  string
+		Realm      string
+		Tier       string
+		Element    string
+		Imperil    string
+		Schools    string
+		SchoolMode string
 	}
 }
 
@@ -2768,6 +2857,11 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	elementFilter := r.URL.Query().Get("element")
 	imperilFilter := r.URL.Query().Get("imperil")
 	effectsParam := r.URL.Query().Get("effects")
+	schoolsParam := r.URL.Query().Get("schools")
+	schoolModeParam := r.URL.Query().Get("schoolmode")
+	if schoolModeParam == "" {
+		schoolModeParam = "and"
+	}
 	ownedOnly := r.URL.Query().Get("owned") == "1"
 
 	var additionalEffects []string
@@ -2776,6 +2870,23 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 			e = strings.TrimSpace(e)
 			if e != "" {
 				additionalEffects = append(additionalEffects, e)
+			}
+		}
+	}
+
+	type schoolReq struct {
+		School   string
+		MinLevel int
+	}
+	var schoolReqs []schoolReq
+	if schoolsParam != "" {
+		for _, pair := range strings.Split(schoolsParam, ",") {
+			parts := strings.SplitN(pair, ":", 2)
+			if len(parts) == 2 {
+				level, err := strconv.Atoi(parts[1])
+				if err == nil && level >= 1 && level <= 6 {
+					schoolReqs = append(schoolReqs, schoolReq{School: parts[0], MinLevel: level})
+				}
 			}
 		}
 	}
@@ -2803,6 +2914,26 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if realmFilter != "" && c.Realm != realmFilter {
 			continue
+		}
+		if len(schoolReqs) > 0 {
+			match := schoolModeParam == "and"
+			for _, req := range schoolReqs {
+				has := c.Schools[req.School] >= req.MinLevel
+				if schoolModeParam == "and" {
+					if !has {
+						match = false
+						break
+					}
+				} else {
+					if has {
+						match = true
+						break
+					}
+				}
+			}
+			if !match {
+				continue
+			}
 		}
 		matchedChars = append(matchedChars, c)
 	}
@@ -2901,6 +3032,8 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	data.Query.Tier = tierFilter
 	data.Query.Element = elementFilter
 	data.Query.Imperil = imperilFilter
+	data.Query.Schools = schoolsParam
+	data.Query.SchoolMode = schoolModeParam
 
 	if u != nil {
 		data.LoggedIn = true
