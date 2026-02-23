@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -12,9 +13,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"sync"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // ---------- data types ----------
@@ -155,7 +157,154 @@ var (
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
+	dataLock      sync.RWMutex
 )
+
+// ---------- CSV auto-update ----------
+
+type csvSheet struct {
+	Filename        string
+	GID             string
+	ExpectedHeaders []string
+}
+
+var csvSheets = []csvSheet{
+	{"Characters.csv", "1771023676", []string{"Realm", "Name", "ID"}},
+	{"Soul-Breaks.csv", "344457459", []string{"Character", "Name", "Tier"}},
+	{"Hero-Abilities.csv", "329671300", []string{"Character", "Name", "Type"}},
+	{"Burst.csv", "1373487754", []string{"Character", "Source", "Name"}},
+	{"Synchro.csv", "13552509", []string{"Character", "Source", "Name"}},
+	{"Zenith-SB-Abilities.csv", "1801274757", []string{"Character", "Source", "Name"}},
+	{"Brave.csv", "1286318057", []string{"Character", "Source", "Name"}},
+	{"Status.csv", "1899148923", []string{"Common Name", "Effects"}},
+}
+
+const sheetID = "1f8OJIQhpycljDQ8QNDk_va1GJ1u7RVoMaNjFcHH0LKk"
+
+func downloadCSV(url string) ([]byte, error) {
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("download: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download: status %d", resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func validateCSV(data []byte, expectedHeaders []string, currentRowCount int) error {
+	r := csv.NewReader(bytes.NewReader(data))
+	r.LazyQuotes = true
+	records, err := r.ReadAll()
+	if err != nil {
+		return fmt.Errorf("parse CSV: %w", err)
+	}
+	if len(records) < 1 {
+		return fmt.Errorf("CSV has no rows")
+	}
+	header := records[0]
+	headerSet := make(map[string]bool, len(header))
+	for _, h := range header {
+		headerSet[h] = true
+	}
+	for _, exp := range expectedHeaders {
+		if !headerSet[exp] {
+			return fmt.Errorf("missing expected header column %q", exp)
+		}
+	}
+	newRowCount := len(records) - 1 // exclude header
+	if currentRowCount > 0 && newRowCount < currentRowCount/2 {
+		return fmt.Errorf("row count %d is less than 50%% of current %d", newRowCount, currentRowCount)
+	}
+	fieldCount := len(header)
+	for i, rec := range records[1:] {
+		if len(rec) > fieldCount*2 {
+			return fmt.Errorf("row %d has %d fields (header has %d), possible mangled row", i+1, len(rec), fieldCount)
+		}
+	}
+	return nil
+}
+
+func countCSVRows(filename string) int {
+	f, err := os.Open(filename)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	r := csv.NewReader(f)
+	r.LazyQuotes = true
+	records, err := r.ReadAll()
+	if err != nil {
+		return 0
+	}
+	if len(records) < 1 {
+		return 0
+	}
+	return len(records) - 1
+}
+
+func updateCSVs() {
+	anyUpdated := false
+	for _, sheet := range csvSheets {
+		url := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
+		data, err := downloadCSV(url)
+		if err != nil {
+			log.Printf("WARNING: failed to download %s: %v", sheet.Filename, err)
+			continue
+		}
+		currentRows := countCSVRows(sheet.Filename)
+		if err := validateCSV(data, sheet.ExpectedHeaders, currentRows); err != nil {
+			log.Printf("WARNING: validation failed for %s: %v", sheet.Filename, err)
+			continue
+		}
+		tmpFile := sheet.Filename + ".tmp"
+		if err := os.WriteFile(tmpFile, data, 0o644); err != nil {
+			log.Printf("WARNING: failed to write %s: %v", tmpFile, err)
+			continue
+		}
+		if err := os.Rename(tmpFile, sheet.Filename); err != nil {
+			log.Printf("WARNING: failed to rename %s to %s: %v", tmpFile, sheet.Filename, err)
+			continue
+		}
+		log.Printf("Updated %s (%d bytes)", sheet.Filename, len(data))
+		anyUpdated = true
+	}
+	if anyUpdated {
+		log.Println("Reloading data after CSV update...")
+		reloadData()
+		log.Println("Data reload complete.")
+	}
+}
+
+func reloadData() {
+	dataLock.Lock()
+	defer dataLock.Unlock()
+
+	characters = nil
+	realmGroups = nil
+
+	loadCharacters()
+	loadSoulBreaks()
+	loadHeroAbilities()
+	loadBurstCommands()
+	loadSynchroAbilities()
+	loadZenithAbilities()
+	loadBraveCommands()
+	loadStatuses()
+	matchSoulBreakEffects()
+	pairDualShifts()
+	pairArcaneDyads()
+	matchBurstCommands()
+	matchSynchroAbilities()
+	matchZenithAbilities()
+	matchBraveCommands()
+	cacheAllImages()
+	buildRealmGroups()
+
+	log.Printf("Reloaded %d characters", len(characters))
+}
 
 // ---------- CSV loading ----------
 
@@ -1735,10 +1884,14 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	dataLock.RLock()
+	defer dataLock.RUnlock()
 	indexTmpl.Execute(w, realmGroups)
 }
 
 func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
+	dataLock.RLock()
+	defer dataLock.RUnlock()
 	names := make([]string, len(characters))
 	for i, c := range characters {
 		names[i] = c.Name
@@ -2001,6 +2154,8 @@ func sbMatchesImperil(sb SoulBreak, element string) bool {
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
+	dataLock.RLock()
+	defer dataLock.RUnlock()
 	charFilter := r.URL.Query().Get("character")
 	realmFilter := r.URL.Query().Get("realm")
 	tierFilter := r.URL.Query().Get("tier")
@@ -2129,6 +2284,8 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func charHandler(w http.ResponseWriter, r *http.Request) {
+	dataLock.RLock()
+	defer dataLock.RUnlock()
 	id := strings.TrimPrefix(r.URL.Path, "/char/")
 	ch, ok := charByID[id]
 	if !ok {
@@ -2148,27 +2305,15 @@ func charHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	log.Println("Loading data...")
-	loadCharacters()
-	loadSoulBreaks()
-	loadHeroAbilities()
-	loadBurstCommands()
-	loadSynchroAbilities()
-	loadZenithAbilities()
-	loadBraveCommands()
-	loadStatuses()
-	matchSoulBreakEffects()
-	pairDualShifts()
-	pairArcaneDyads()
-	matchBurstCommands()
-	matchSynchroAbilities()
-	matchZenithAbilities()
-	matchBraveCommands()
+	reloadData()
 
-	log.Println("Caching images...")
-	cacheAllImages()
-
-	buildRealmGroups()
-	log.Printf("Loaded %d characters", len(characters))
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		for range ticker.C {
+			log.Println("Auto-updating CSVs from Google Sheets...")
+			updateCSVs()
+		}
+	}()
 
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
 	http.HandleFunc("/", indexHandler)
