@@ -898,6 +898,11 @@ const searchBarHTML = `
         <label><input type="checkbox" value="instant_atb"> Instant ATB</label>
         <label><input type="checkbox" value="atb_speed"> ATB Speed</label>
       </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="weakness_boost"> Weakness Boost</label>
+        <label><input type="checkbox" value="magical_boost"> Magical Boost</label>
+        <label><input type="checkbox" value="phy_boost"> PHY Boost</label>
+      </div>
     </div>
     <div class="modal-buttons">
       <button class="secondary" onclick="clearEffects()">Clear All</button>
@@ -1750,6 +1755,9 @@ var aegisCounterRe = regexp.MustCompile(`DEF, RES and MND -\d+%`)
 var fullbreakCounterRe = regexp.MustCompile(`ATK, DEF, MAG and RES \+\d+%`)
 var physJobBreakCounterRe = regexp.MustCompile(`ATK and MND \+\d+%, DEF and RES \+\d+%`)
 var magJobBreakCounterRe = regexp.MustCompile(`MAG and MND \+\d+%, DEF and RES \+\d+%`)
+var weaknessBoostRe = regexp.MustCompile(`Weakness \+\d+%`)
+var magicalBoostRe = regexp.MustCompile(`Magical \+\d+%`)
+var phyBoostRe = regexp.MustCompile(`PHY \+\d+%`)
 
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
@@ -1807,6 +1815,15 @@ var effectCheckers = map[string]func(string) bool{
 	},
 	"atb_speed": func(text string) bool {
 		return atbSpeedRe.MatchString(text)
+	},
+	"weakness_boost": func(text string) bool {
+		return weaknessBoostRe.MatchString(text)
+	},
+	"magical_boost": func(text string) bool {
+		return magicalBoostRe.MatchString(text)
+	},
+	"phy_boost": func(text string) bool {
+		return phyBoostRe.MatchString(text)
 	},
 }
 
