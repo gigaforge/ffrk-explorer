@@ -902,6 +902,8 @@ const searchBarHTML = `
         <label><input type="checkbox" value="weakness_boost"> Weakness Boost</label>
         <label><input type="checkbox" value="magical_boost"> Magical Boost</label>
         <label><input type="checkbox" value="phy_boost"> PHY Boost</label>
+        <label><input type="checkbox" value="deshell"> Deshell</label>
+        <label><input type="checkbox" value="deprotect"> Deprotect</label>
       </div>
     </div>
     <div class="modal-buttons">
@@ -1825,6 +1827,12 @@ var effectCheckers = map[string]func(string) bool{
 	},
 	"phy_boost": func(text string) bool {
 		return phyBoostRe.MatchString(text)
+	},
+	"deshell": func(text string) bool {
+		return strings.Contains(text, "Deshell")
+	},
+	"deprotect": func(text string) bool {
+		return strings.Contains(text, "Deprotect")
 	},
 }
 
