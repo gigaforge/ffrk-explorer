@@ -1524,6 +1524,18 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 
 // ---------- templates ----------
 
+const kofiWidget = `
+<script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
+<script>
+  kofiWidgetOverlay.draw('gigaforge', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Tip Me',
+    'floating-chat.donateButton.background-color': '#fcbf47',
+    'floating-chat.donateButton.text-color': '#323842'
+  });
+</script>
+`
+
 const searchBarCSS = `
 .search-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100;
               background: #16213e; border-bottom: 2px solid #0f3460;
@@ -1912,7 +1924,7 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
   </div>
 </div>
 {{end}}
-</body></html>`))
+` + kofiWidget + `</body></html>`))
 
 var charTmpl = template.Must(template.New("char").Funcs(funcMap).Parse(`<!DOCTYPE html>
 <html><head>
@@ -2271,7 +2283,7 @@ function toggleOwned(cb){
 }
 function onAuthChange(){window.location.reload()}
 </script>
-</body></html>`))
+` + kofiWidget + `</body></html>`))
 
 type SearchData struct {
 	Results         []SearchResult
@@ -2667,7 +2679,7 @@ function toggleOwned(cb){
 }
 function onAuthChange(){window.location.reload()}
 </script>
-</body></html>`))
+` + kofiWidget + `</body></html>`))
 
 // ---------- handlers ----------
 
