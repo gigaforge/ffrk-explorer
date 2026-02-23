@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -122,6 +123,12 @@ type HeroAbility struct {
 	Effects   string
 	School    string
 	ID        string
+}
+
+type SearchResult struct {
+	Character     Character
+	HeroAbilities []HeroAbility
+	SoulBreaks    []SoulBreak
 }
 
 type RealmGroup struct {
@@ -784,6 +791,169 @@ func cacheAllImages() {
 
 // ---------- templates ----------
 
+const searchBarCSS = `
+.search-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+              background: #16213e; border-bottom: 2px solid #0f3460;
+              padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px;
+              align-items: center; }
+.search-bar input, .search-bar select { background: #1a1a2e; color: #e0e0e0;
+              border: 1px solid #0f3460; border-radius: 4px; padding: 6px 10px;
+              font-size: 14px; }
+.search-bar input:focus, .search-bar select:focus { outline: none; border-color: #e94560; }
+.search-bar input[type="text"] { width: 180px; }
+.search-bar select { min-width: 100px; }
+.search-bar button { background: #e94560; color: #fff; border: none; border-radius: 4px;
+                     padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.search-bar button:hover { background: #d63050; }
+.search-bar label { color: #888; font-size: 12px; margin-right: -4px; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                 background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.visible { display: flex; }
+.modal { background: #16213e; border: 2px solid #0f3460; border-radius: 8px;
+         padding: 20px; min-width: 500px; max-width: 90vw; }
+.modal h3 { color: #e94560; margin-bottom: 12px; }
+.modal-columns { display: flex; gap: 24px; flex-wrap: wrap; }
+.modal-col { display: flex; flex-direction: column; gap: 8px; min-width: 120px; }
+.modal-col label { color: #e0e0e0; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.modal-col input[type="checkbox"] { accent-color: #e94560; }
+.modal-buttons { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+.modal-buttons button { background: #e94560; color: #fff; border: none; border-radius: 4px;
+                        padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.modal-buttons button:hover { background: #d63050; }
+.modal-buttons button.secondary { background: #0f3460; }
+.modal-buttons button.secondary:hover { background: #1a3a6e; }
+.effects-badge { background: #0f3460; color: #e94560; border-radius: 10px; padding: 1px 7px;
+                 font-size: 11px; margin-left: 4px; }
+`
+
+const searchBarHTML = `
+<div class="search-bar">
+  <label>Character</label>
+  <input type="text" id="char-input" list="char-list" placeholder="Name...">
+  <datalist id="char-list"></datalist>
+  <label>Realm</label>
+  <select id="realm-select">
+    <option value="">Any</option>
+    <option>I</option><option>II</option><option>III</option><option>IV</option>
+    <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
+    <option>IX</option><option>X</option><option>XI</option><option>XII</option>
+    <option>XIII</option><option>XIV</option><option>XV</option><option>XVI</option>
+    <option>FFT</option><option>Type-0</option><option>KH</option><option>Beyond</option><option>Core</option>
+  </select>
+  <label>SB Tier</label>
+  <select id="tier-select">
+    <option value="">Any</option>
+    <option>SB</option><option>SSB</option><option>BSB</option><option>OSB</option>
+    <option>USB</option><option>AOSB</option><option>CSB</option><option>CSB+</option>
+    <option>DASB</option><option>ADSB</option><option>SASB</option><option>ZSB</option>
+    <option>OZSB</option><option>Glint</option><option>Glint+</option><option>AASB</option>
+    <option>LBO</option><option>LBG</option><option>LBGS</option>
+  </select>
+  <label>En-Element</label>
+  <select id="en-element-select">
+    <option value="">Any</option>
+    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+    <option>Poison</option>
+  </select>
+  <label>Imperil</label>
+  <select id="imperil-select">
+    <option value="">Any</option>
+    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+    <option>Poison</option><option>Prismatic</option>
+  </select>
+  <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="doSearch()">Search</button>
+</div>
+<div class="modal-overlay" id="effects-modal">
+  <div class="modal">
+    <h3>Additional Effects</h3>
+    <div class="modal-columns">
+      <div class="modal-col">
+        <label><input type="checkbox" value="haste"> Haste</label>
+        <label><input type="checkbox" value="protect"> Protect</label>
+        <label><input type="checkbox" value="shell"> Shell</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="last_stand"> Last Stand</label>
+        <label><input type="checkbox" value="regen"> Regen</label>
+        <label><input type="checkbox" value="regenga"> Regenga</label>
+        <label><input type="checkbox" value="astra"> Astra</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="crit_chance"> Critical Chance</label>
+        <label><input type="checkbox" value="crit_damage"> Critical Damage</label>
+        <label><input type="checkbox" value="sb_gauge"> SB Gauge</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="dualcast"> Dualcast</label>
+        <label><input type="checkbox" value="triplecast"> Triplecast</label>
+        <label><input type="checkbox" value="instant_atb"> Instant ATB</label>
+        <label><input type="checkbox" value="atb_speed"> ATB Speed</label>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="clearEffects()">Clear All</button>
+      <button onclick="closeEffectsModal()">Done</button>
+    </div>
+  </div>
+</div>
+<script>
+fetch('/api/characters').then(r=>r.json()).then(names=>{
+  var dl=document.getElementById('char-list');
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o)});
+});
+function openEffectsModal(){document.getElementById('effects-modal').classList.add('visible')}
+function closeEffectsModal(){document.getElementById('effects-modal').classList.remove('visible');updateBadge()}
+function clearEffects(){
+  document.querySelectorAll('#effects-modal input[type=checkbox]').forEach(function(cb){cb.checked=false});
+  updateBadge();
+}
+function getCheckedEffects(){
+  var eff=[];
+  document.querySelectorAll('#effects-modal input[type=checkbox]:checked').forEach(function(cb){eff.push(cb.value)});
+  return eff;
+}
+function updateBadge(){
+  var eff=getCheckedEffects();
+  var badge=document.getElementById('effects-badge');
+  if(eff.length>0){badge.textContent=eff.length;badge.style.display='inline'}
+  else{badge.style.display='none'}
+}
+document.getElementById('effects-modal').addEventListener('click',function(e){
+  if(e.target===this)closeEffectsModal();
+});
+function doSearch(){
+  var p=new URLSearchParams();
+  var c=document.getElementById('char-input').value;if(c)p.set('character',c);
+  var r=document.getElementById('realm-select').value;if(r)p.set('realm',r);
+  var t=document.getElementById('tier-select').value;if(t)p.set('tier',t);
+  var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
+  var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
+  var eff=getCheckedEffects();if(eff.length>0)p.set('effects',eff.join(','));
+  window.location='/search?'+p.toString();
+}
+document.getElementById('char-input').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch()});
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  if(p.get('character'))document.getElementById('char-input').value=p.get('character');
+  if(p.get('realm'))document.getElementById('realm-select').value=p.get('realm');
+  if(p.get('tier'))document.getElementById('tier-select').value=p.get('tier');
+  if(p.get('element'))document.getElementById('en-element-select').value=p.get('element');
+  if(p.get('imperil'))document.getElementById('imperil-select').value=p.get('imperil');
+  if(p.get('effects')){
+    var eff=p.get('effects').split(',');
+    eff.forEach(function(v){
+      var cb=document.querySelector('#effects-modal input[value="'+v+'"]');
+      if(cb)cb.checked=true;
+    });
+    updateBadge();
+  }
+})();
+</script>
+`
+
 var funcMap = template.FuncMap{
 	"stars": func(n int) string {
 		return strings.Repeat("★", n)
@@ -797,7 +967,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(funcMap).Parse(`<!DOCT
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-       background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+       background: #1a1a2e; color: #e0e0e0; padding: 70px 20px 20px; }
+` + searchBarCSS + `
 h1 { text-align: center; color: #e94560; margin-bottom: 24px; }
 h2 { color: #0f3460; background: #e94560; display: inline-block;
      padding: 4px 16px; border-radius: 4px; margin: 20px 0 12px; font-size: 1.1em; }
@@ -814,6 +985,7 @@ h2 { color: #0f3460; background: #e94560; display: inline-block;
 .char-card .name { font-size: 14px; line-height: 1.3; word-wrap: break-word; }
 </style>
 </head><body>
+` + searchBarHTML + `
 <h1>FFRK Community Database</h1>
 {{range .}}
 <div class="realm-section">
@@ -838,8 +1010,9 @@ var charTmpl = template.Must(template.New("char").Funcs(funcMap).Parse(`<!DOCTYP
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-       background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 1200px; margin: 0 auto;
+       background: #1a1a2e; color: #e0e0e0; padding: 70px 20px 20px; max-width: 1200px; margin: 0 auto;
        font-size: 16px; }
+` + searchBarCSS + `
 a { color: #e94560; }
 h1 { color: #e94560; margin-bottom: 4px; }
 .subtitle { color: #888; margin-bottom: 20px; }
@@ -893,6 +1066,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 </style>
 </head><body>
+` + searchBarHTML + `
 <a class="back" href="/">← All Characters</a>
 <h1>{{.Character.Name}}</h1>
 <div class="subtitle">{{.Character.Realm}}</div>
@@ -1179,6 +1353,367 @@ function toggleBcDetail(row) {
 </script>
 </body></html>`))
 
+type SearchData struct {
+	Results   []SearchResult
+	Truncated bool
+	Query     struct {
+		Character string
+		Realm     string
+		Tier      string
+		Element   string
+		Imperil   string
+	}
+}
+
+var searchTmpl = template.Must(template.New("search").Funcs(funcMap).Parse(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>Search - FFRK</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+       background: #1a1a2e; color: #e0e0e0; padding: 70px 20px 20px; max-width: 1200px; margin: 0 auto;
+       font-size: 16px; }
+` + searchBarCSS + `
+a { color: #e94560; }
+h1 { color: #e94560; margin-bottom: 16px; }
+h2 { color: #0f3460; background: #e94560; display: inline-block;
+     padding: 4px 16px; border-radius: 4px; margin: 20px 0 12px; font-size: 1em; }
+.char-header { display: flex; align-items: center; gap: 12px; margin: 24px 0 8px; }
+.char-header img { width: 48px; height: 48px; object-fit: contain; }
+.char-header .name { color: #e94560; font-size: 1.2em; font-weight: bold; }
+.char-header .realm { color: #888; font-size: 0.9em; margin-left: 8px; }
+.warning { background: #4a2020; border: 1px solid #e94560; border-radius: 4px;
+           padding: 8px 16px; margin-bottom: 16px; color: #e0e0e0; }
+.no-results { color: #888; font-size: 1.1em; margin-top: 24px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 15px; }
+th { background: #0f3460; padding: 6px 8px; text-align: left; }
+td { background: #16213e; padding: 6px 8px; border-bottom: 1px solid #1a1a2e; }
+td img { width: 64px; height: 64px; object-fit: contain; vertical-align: middle; }
+.effects { max-width: 500px; }
+.sb-icon { width: 64px; height: 64px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.sb-icon img { width: 96px; height: 96px; object-fit: contain; margin: -16px; }
+tr.sb-row { cursor: pointer; }
+tr.sb-row:hover td { background: #1b2a4a; }
+td.sb-chevron { width: 16px; padding: 6px 2px; text-align: center; }
+td.sb-chevron .chevron { display: inline-block; font-size: 14px; color: #e94560;
+                          transition: transform 0.2s; }
+tr.sb-row.expanded td.sb-chevron .chevron { transform: rotate(90deg); }
+tr.sb-detail { display: none; }
+tr.sb-detail.visible { display: table-row; }
+tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
+.effect-list { list-style: none; padding: 0; margin: 0; }
+.effect-list li { padding: 4px 0; border-bottom: 1px solid #16213e; }
+.effect-list li:last-child { border-bottom: none; }
+.effect-name { color: #e94560; font-weight: bold; }
+.effect-duration { color: #e9c46a; font-size: 14px; margin-left: 8px; }
+.effect-desc { color: #aaa; font-size: 14px; display: block; margin-top: 2px; }
+.burst-commands { margin-bottom: 8px; }
+.burst-title { color: #e94560; font-weight: bold; margin-bottom: 6px; font-size: 15px; }
+.burst-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 14px; }
+.burst-table th { background: #162040; padding: 4px 6px; text-align: left; font-size: 13px; }
+.burst-table td { background: #0f1a2e; padding: 4px 6px; border-bottom: 1px solid #1a1a2e; }
+.burst-icon { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
+tr.bc-row { cursor: pointer; }
+tr.bc-row:hover td { background: #152035; }
+tr.bc-row td.bc-chevron { width: 16px; padding: 4px 2px; text-align: center; }
+tr.bc-row td.bc-chevron .chevron { display: inline-block; font-size: 12px; color: #e94560;
+                                    transition: transform 0.2s; }
+tr.bc-row.expanded td.bc-chevron .chevron { transform: rotate(90deg); }
+tr.bc-detail { display: none; }
+tr.bc-detail.visible { display: table-row; }
+tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
+.brave-condition { color: #aaa; font-size: 13px; margin-bottom: 6px; }
+.brave-icon-wrap { position: relative; width: 32px; height: 32px; }
+.brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+.brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+</style>
+</head><body>
+` + searchBarHTML + `
+<h1>Search Results</h1>
+{{if .Truncated}}<div class="warning">Results truncated to 100 items. Try narrowing your search.</div>{{end}}
+{{if not .Results}}<div class="no-results">No results found.</div>{{end}}
+{{range .Results}}
+<div class="char-header">
+  {{if .Character.Img}}<img src="{{.Character.Img}}" alt="{{.Character.Name}}">{{end}}
+  <div><a href="/char/{{.Character.ID}}" class="name">{{.Character.Name}}</a><span class="realm">{{.Character.Realm}}</span></div>
+</div>
+
+{{if .HeroAbilities}}
+<table>
+<tr><th></th><th>Name</th><th>School</th><th>Type</th><th>Element</th><th>Effects</th></tr>
+{{range .HeroAbilities}}
+<tr>
+  <td>{{if .Img}}<img src="{{.Img}}">{{end}}</td>
+  <td>{{.Name}} ({{.HAVer}})</td>
+  <td>{{.School}}</td>
+  <td>{{.Type}}</td>
+  <td>{{.Element}}</td>
+  <td class="effects">{{.Effects}}</td>
+</tr>
+{{end}}
+</table>
+{{end}}
+
+{{if .SoulBreaks}}
+<table>
+<tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+{{range .SoulBreaks}}
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
+  <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
+  <td>{{.Name}}</td>
+  <td>{{.Tier}}</td>
+  <td>{{.Type}}</td>
+  <td>{{.Element}}</td>
+  <td>{{.Time}}</td>
+  <td class="effects">{{.Effects}}</td>
+</tr>
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}
+<tr class="sb-detail">
+  <td colspan="8">
+    {{if .BraveCommand}}
+    <div class="burst-commands">
+      <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
+      <div class="brave-condition">Condition: {{.BraveCommand.Condition}} | School: {{.BraveCommand.School}}</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Level</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .BraveCommand.Levels}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td><div class="brave-icon-wrap"><img src="/images/brave/BraveAttack{{.Level}}.png" class="brave-bg"><img src="/images/brave/BraveBase.png" class="brave-fg"></div></td>
+          <td>{{.Level}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="8">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .DualShift}}
+    <div class="burst-commands">
+      <div class="burst-title">Dual Shift</div>
+      <table class="burst-table">
+        <tr><th></th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        <tr class="bc-row{{if .DualShift.MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .DualShift.MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{.DualShift.Type}}</td>
+          <td>{{.DualShift.Element}}</td>
+          <td>{{.DualShift.Time}}</td>
+          <td class="effects">{{.DualShift.Effects}}</td>
+        </tr>
+        {{if .DualShift.MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="5">
+            <ul class="effect-list">
+            {{range .DualShift.MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .ArcaneDyad}}
+    <div class="burst-commands">
+      <div class="burst-title">Arcane Dyad Finisher</div>
+      <table class="burst-table">
+        <tr><th></th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        <tr class="bc-row{{if .ArcaneDyad.MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .ArcaneDyad.MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{.ArcaneDyad.Type}}</td>
+          <td>{{.ArcaneDyad.Element}}</td>
+          <td>{{.ArcaneDyad.Time}}</td>
+          <td class="effects">{{.ArcaneDyad.Effects}}</td>
+        </tr>
+        {{if .ArcaneDyad.MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="5">
+            <ul class="effect-list">
+            {{range .ArcaneDyad.MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .ZenithAbilities}}
+    <div class="burst-commands">
+      <div class="burst-title">Zenith SB Abilities</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .ZenithAbilities}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="9">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .SynchroAbilities}}
+    <div class="burst-commands">
+      <div class="burst-title">Synchro Abilities</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Condition</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .SynchroAbilities}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Condition}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="10">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .BurstCommands}}
+    <div class="burst-commands">
+      <div class="burst-title">Burst Commands</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .BurstCommands}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="9">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .MatchedEffects}}
+    <ul class="effect-list">
+    {{range .MatchedEffects}}
+      <li>
+        <span class="effect-name">{{.Name}}</span>
+        {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+        <span class="effect-desc">{{.Description}}</span>
+      </li>
+    {{end}}
+    </ul>
+    {{end}}
+  </td>
+</tr>
+{{end}}
+{{end}}
+</table>
+{{end}}
+
+{{end}}
+
+<script>
+function toggleDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('sb-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+}
+function toggleBcDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('bc-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+  event.stopPropagation();
+}
+</script>
+</body></html>`))
+
 // ---------- handlers ----------
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -1187,6 +1722,356 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	indexTmpl.Execute(w, realmGroups)
+}
+
+func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
+	names := make([]string, len(characters))
+	for i, c := range characters {
+		names[i] = c.Name
+	}
+	sort.Strings(names)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(names)
+}
+
+// ---------- additional effect matching ----------
+
+var critChanceRe = regexp.MustCompile(`\d+% Critical[\]\s\d]`)
+var critDamageRe = regexp.MustCompile(`Critical Damage \+\d+%`)
+var sbGaugeRe = regexp.MustCompile(`Soul Break Gauge \+`)
+var atbSpeedRe = regexp.MustCompile(`\d+% ATB`)
+
+// effectCheckers maps effect filter keys to functions that check if a text matches.
+var effectCheckers = map[string]func(string) bool{
+	"haste": func(text string) bool {
+		return strings.Contains(text, "[Haste]") || strings.Contains(text, "Haste]")
+	},
+	"protect": func(text string) bool {
+		return strings.Contains(text, "[Protect]") || strings.Contains(text, "Protect]")
+	},
+	"shell": func(text string) bool {
+		return strings.Contains(text, "[Shell]") || strings.Contains(text, "Shell]")
+	},
+	"last_stand": func(text string) bool {
+		return strings.Contains(text, "Last Stand")
+	},
+	"regen": func(text string) bool {
+		return strings.Contains(text, "[Regen]") || strings.Contains(text, "[High Regen]") ||
+			strings.Contains(text, "Regen]") || strings.Contains(text, "High Regen")
+	},
+	"regenga": func(text string) bool {
+		return strings.Contains(text, "Regenga")
+	},
+	"astra": func(text string) bool {
+		return strings.Contains(text, "Astra")
+	},
+	"crit_chance": func(text string) bool {
+		return critChanceRe.MatchString(text)
+	},
+	"crit_damage": func(text string) bool {
+		return critDamageRe.MatchString(text)
+	},
+	"sb_gauge": func(text string) bool {
+		return sbGaugeRe.MatchString(text)
+	},
+	"dualcast": func(text string) bool {
+		return strings.Contains(text, "Dualcast")
+	},
+	"triplecast": func(text string) bool {
+		return strings.Contains(text, "Triplecast")
+	},
+	"instant_atb": func(text string) bool {
+		return strings.Contains(text, "Instant ATB")
+	},
+	"atb_speed": func(text string) bool {
+		return atbSpeedRe.MatchString(text)
+	},
+}
+
+// collectAllText gathers the SB's effects text, its sub-ability effects, and
+// all matched status effect descriptions into a single combined string.
+func collectSBTexts(sb SoulBreak) []string {
+	texts := []string{sb.Effects}
+	for _, se := range sb.MatchedEffects {
+		texts = append(texts, se.Name, se.Description)
+	}
+	if sb.DualShift != nil {
+		texts = append(texts, sb.DualShift.Effects)
+		for _, se := range sb.DualShift.MatchedEffects {
+			texts = append(texts, se.Name, se.Description)
+		}
+	}
+	if sb.ArcaneDyad != nil {
+		texts = append(texts, sb.ArcaneDyad.Effects)
+		for _, se := range sb.ArcaneDyad.MatchedEffects {
+			texts = append(texts, se.Name, se.Description)
+		}
+	}
+	for _, bc := range sb.BurstCommands {
+		texts = append(texts, bc.Effects)
+		for _, se := range bc.MatchedEffects {
+			texts = append(texts, se.Name, se.Description)
+		}
+	}
+	for _, sa := range sb.SynchroAbilities {
+		texts = append(texts, sa.Effects)
+		for _, se := range sa.MatchedEffects {
+			texts = append(texts, se.Name, se.Description)
+		}
+	}
+	for _, za := range sb.ZenithAbilities {
+		texts = append(texts, za.Effects)
+		for _, se := range za.MatchedEffects {
+			texts = append(texts, se.Name, se.Description)
+		}
+	}
+	if sb.BraveCommand != nil {
+		for _, bl := range sb.BraveCommand.Levels {
+			texts = append(texts, bl.Effects)
+			for _, se := range bl.MatchedEffects {
+				texts = append(texts, se.Name, se.Description)
+			}
+		}
+	}
+	return texts
+}
+
+// sbMatchesAdditionalEffects checks if a soul break matches ALL of the given effect filters.
+func sbMatchesAdditionalEffects(sb SoulBreak, effects []string) bool {
+	texts := collectSBTexts(sb)
+	for _, eff := range effects {
+		checker, ok := effectCheckers[eff]
+		if !ok {
+			continue
+		}
+		found := false
+		for _, t := range texts {
+			if checker(t) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// haMatchesAdditionalEffects checks if a hero ability matches ALL of the given effect filters.
+func haMatchesAdditionalEffects(ha HeroAbility, effects []string) bool {
+	for _, eff := range effects {
+		checker, ok := effectCheckers[eff]
+		if !ok {
+			continue
+		}
+		if !checker(ha.Effects) {
+			return false
+		}
+	}
+	return true
+}
+
+// textContainsAttach checks if text contains "Attach <element>" pattern
+func textContainsAttach(text, element string) bool {
+	return strings.Contains(text, "Attach "+element)
+}
+
+// textContainsImperil checks if text contains "Imperil <element>" or "Imperil Prismatic"
+func textContainsImperil(text, element string) bool {
+	if strings.Contains(text, "Imperil "+element) {
+		return true
+	}
+	// "Imperil Prismatic" matches any specific element
+	if element != "Prismatic" && strings.Contains(text, "Imperil Prismatic") {
+		return true
+	}
+	return false
+}
+
+// sbMatchesElement checks if a soul break (including sub-abilities) matches en-element criteria
+func sbMatchesElement(sb SoulBreak, element string) bool {
+	if textContainsAttach(sb.Effects, element) {
+		return true
+	}
+	if sb.DualShift != nil && textContainsAttach(sb.DualShift.Effects, element) {
+		return true
+	}
+	if sb.ArcaneDyad != nil && textContainsAttach(sb.ArcaneDyad.Effects, element) {
+		return true
+	}
+	for _, bc := range sb.BurstCommands {
+		if textContainsAttach(bc.Effects, element) {
+			return true
+		}
+	}
+	for _, sa := range sb.SynchroAbilities {
+		if textContainsAttach(sa.Effects, element) {
+			return true
+		}
+	}
+	for _, za := range sb.ZenithAbilities {
+		if textContainsAttach(za.Effects, element) {
+			return true
+		}
+	}
+	return false
+}
+
+// sbMatchesImperil checks if a soul break (including sub-abilities) matches imperil criteria
+func sbMatchesImperil(sb SoulBreak, element string) bool {
+	if textContainsImperil(sb.Effects, element) {
+		return true
+	}
+	if sb.DualShift != nil && textContainsImperil(sb.DualShift.Effects, element) {
+		return true
+	}
+	if sb.ArcaneDyad != nil && textContainsImperil(sb.ArcaneDyad.Effects, element) {
+		return true
+	}
+	for _, bc := range sb.BurstCommands {
+		if textContainsImperil(bc.Effects, element) {
+			return true
+		}
+	}
+	for _, sa := range sb.SynchroAbilities {
+		if textContainsImperil(sa.Effects, element) {
+			return true
+		}
+	}
+	for _, za := range sb.ZenithAbilities {
+		if textContainsImperil(za.Effects, element) {
+			return true
+		}
+	}
+	return false
+}
+
+func searchHandler(w http.ResponseWriter, r *http.Request) {
+	charFilter := r.URL.Query().Get("character")
+	realmFilter := r.URL.Query().Get("realm")
+	tierFilter := r.URL.Query().Get("tier")
+	elementFilter := r.URL.Query().Get("element")
+	imperilFilter := r.URL.Query().Get("imperil")
+	effectsParam := r.URL.Query().Get("effects")
+
+	var additionalEffects []string
+	if effectsParam != "" {
+		for _, e := range strings.Split(effectsParam, ",") {
+			e = strings.TrimSpace(e)
+			if e != "" {
+				additionalEffects = append(additionalEffects, e)
+			}
+		}
+	}
+
+	hasEffectFilter := elementFilter != "" || imperilFilter != "" || len(additionalEffects) > 0
+	hasSBFilter := tierFilter != "" || hasEffectFilter
+
+	// Filter characters
+	var matchedChars []Character
+	for _, c := range characters {
+		if charFilter != "" && !strings.Contains(strings.ToLower(c.Name), strings.ToLower(charFilter)) {
+			continue
+		}
+		if realmFilter != "" && c.Realm != realmFilter {
+			continue
+		}
+		matchedChars = append(matchedChars, c)
+	}
+
+	sort.Slice(matchedChars, func(i, j int) bool {
+		return matchedChars[i].Name < matchedChars[j].Name
+	})
+
+	var results []SearchResult
+	totalCount := 0
+	truncated := false
+	const maxResults = 100
+
+	for _, c := range matchedChars {
+		if truncated {
+			break
+		}
+
+		// Collect matching soul breaks
+		var matchedSBs []SoulBreak
+		for _, sb := range soulBreaks[c.Name] {
+			if tierFilter != "" && sb.Tier != tierFilter {
+				continue
+			}
+			if elementFilter != "" && !sbMatchesElement(sb, elementFilter) {
+				continue
+			}
+			if imperilFilter != "" && !sbMatchesImperil(sb, imperilFilter) {
+				continue
+			}
+			if len(additionalEffects) > 0 && !sbMatchesAdditionalEffects(sb, additionalEffects) {
+				continue
+			}
+			matchedSBs = append(matchedSBs, sb)
+			totalCount++
+			if totalCount >= maxResults {
+				truncated = true
+				break
+			}
+		}
+
+		// Collect matching hero abilities (skip if only SB-specific filters are active)
+		var matchedHAs []HeroAbility
+		if !truncated && !hasSBFilter {
+			for _, ha := range heroAbilities[c.Name] {
+				matchedHAs = append(matchedHAs, ha)
+				totalCount++
+				if totalCount >= maxResults {
+					truncated = true
+					break
+				}
+			}
+		} else if !truncated && hasEffectFilter {
+			for _, ha := range heroAbilities[c.Name] {
+				match := false
+				if elementFilter != "" && textContainsAttach(ha.Effects, elementFilter) {
+					match = true
+				}
+				if imperilFilter != "" && textContainsImperil(ha.Effects, imperilFilter) {
+					match = true
+				}
+				if len(additionalEffects) > 0 && haMatchesAdditionalEffects(ha, additionalEffects) {
+					match = true
+				}
+				if !match {
+					continue
+				}
+				matchedHAs = append(matchedHAs, ha)
+				totalCount++
+				if totalCount >= maxResults {
+					truncated = true
+					break
+				}
+			}
+		}
+
+		if len(matchedSBs) > 0 || len(matchedHAs) > 0 {
+			results = append(results, SearchResult{
+				Character:     c,
+				SoulBreaks:    matchedSBs,
+				HeroAbilities: matchedHAs,
+			})
+		}
+	}
+
+	data := SearchData{
+		Results:   results,
+		Truncated: truncated,
+	}
+	data.Query.Character = charFilter
+	data.Query.Realm = realmFilter
+	data.Query.Tier = tierFilter
+	data.Query.Element = elementFilter
+	data.Query.Imperil = imperilFilter
+
+	searchTmpl.Execute(w, data)
 }
 
 func charHandler(w http.ResponseWriter, r *http.Request) {
@@ -1234,6 +2119,8 @@ func main() {
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/char/", charHandler)
+	http.HandleFunc("/search", searchHandler)
+	http.HandleFunc("/api/characters", characterAPIHandler)
 
 	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)
