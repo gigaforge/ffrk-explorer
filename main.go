@@ -74,6 +74,23 @@ type ZenithAbility struct {
 	MatchedEffects []StatusEffect
 }
 
+type BraveLevel struct {
+	Level          string
+	Type           string
+	Target         string
+	Element        string
+	Time           string
+	Effects        string
+	MatchedEffects []StatusEffect
+}
+
+type BraveCommand struct {
+	Name      string
+	School    string
+	Condition string
+	Levels    []BraveLevel // 0-3
+}
+
 type SoulBreak struct {
 	Character        string
 	Img              string
@@ -90,6 +107,7 @@ type SoulBreak struct {
 	SynchroAbilities []SynchroAbility
 	ZenithAbilities  []ZenithAbility
 	DualShift        *SoulBreak
+	BraveCommand     *BraveCommand
 }
 
 type HeroAbility struct {
@@ -125,6 +143,7 @@ var (
 	burstCommands    map[string][]BurstCommand    // keyed by "Character|Source"
 	synchroAbilities map[string][]SynchroAbility  // keyed by "Character|Source"
 	zenithAbilities  map[string][]ZenithAbility   // keyed by "Character|Source"
+	braveCommands    map[string]*BraveCommand     // keyed by "Character|Source"
 	statusEffects map[string]StatusEffect   // keyed by Common Name
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
@@ -368,6 +387,60 @@ func matchZenithAbilities() {
 	}
 }
 
+func loadBraveCommands() {
+	braveCommands = make(map[string]*BraveCommand)
+	rows := mustReadCSV("Brave.csv")
+	for _, row := range rows {
+		key := row["Character"] + "|" + row["Source"]
+		bc, ok := braveCommands[key]
+		if !ok {
+			bc = &BraveCommand{
+				Name:      row["Name"],
+				School:    row["School"],
+				Condition: row["Brave Condition"],
+			}
+			braveCommands[key] = bc
+		}
+		bl := BraveLevel{
+			Level:   row["Brave"],
+			Type:    row["Type"],
+			Target:  row["Target"],
+			Element: row["Element"],
+			Time:    row["Time"],
+			Effects: row["Effects"],
+		}
+		bc.Levels = append(bc.Levels, bl)
+	}
+	// Sort levels by Brave value (0-3)
+	for _, bc := range braveCommands {
+		sort.Slice(bc.Levels, func(i, j int) bool {
+			return bc.Levels[i].Level < bc.Levels[j].Level
+		})
+	}
+	log.Printf("Loaded %d brave commands", len(braveCommands))
+}
+
+func matchBraveCommands() {
+	for name, sbList := range soulBreaks {
+		for i := range sbList {
+			if !strings.Contains(sbList[i].Effects, "[Brave Mode]") {
+				continue
+			}
+			key := sbList[i].Character + "|" + sbList[i].Name
+			if bc, ok := braveCommands[key]; ok {
+				matched := *bc
+				matched.Levels = make([]BraveLevel, len(bc.Levels))
+				copy(matched.Levels, bc.Levels)
+				for j := range matched.Levels {
+					matched.Levels[j].MatchedEffects = matchEffectsInText(matched.Levels[j].Effects)
+				}
+				sbList[i].BraveCommand = &matched
+			}
+		}
+		soulBreaks[name] = sbList
+	}
+}
+
 func loadStatuses() {
 	statusEffects = make(map[string]StatusEffect)
 	rows := mustReadCSV("Status.csv")
@@ -556,6 +629,30 @@ func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
 	return servePath
 }
 
+// ensureCachedFile downloads a fixed URL to localPath if not already present.
+func ensureCachedFile(localPath, remoteURL string) {
+	if _, err := os.Stat(localPath); err == nil {
+		return
+	}
+	resp, err := http.Get(remoteURL)
+	if err != nil {
+		log.Printf("fetch %s: %v", remoteURL, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("fetch %s: status %d", remoteURL, resp.StatusCode)
+		return
+	}
+	f, err := os.Create(localPath)
+	if err != nil {
+		log.Printf("create %s: %v", localPath, err)
+		return
+	}
+	defer f.Close()
+	io.Copy(f, resp.Body)
+}
+
 type imageJob struct {
 	dir       string
 	urlPath   string
@@ -565,9 +662,16 @@ type imageJob struct {
 }
 
 func cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave"}
 	for _, d := range dirs {
 		os.MkdirAll(d, 0o755)
+	}
+
+	// Cache static brave images
+	ensureCachedFile("images/brave/BraveBase.png", "https://dff.sp.mbga.jp/dff/static/lang/image/ability/30151001/30151001_128.png")
+	for i := 0; i <= 3; i++ {
+		ensureCachedFile(fmt.Sprintf("images/brave/BraveAttack%d.png", i),
+			fmt.Sprintf("https://dff.sp.mbga.jp/dff/static/lang/image/brave/level/level_%d.png", i))
 	}
 
 	const (
@@ -748,6 +852,10 @@ tr.bc-row.expanded td.bc-chevron .chevron { transform: rotate(90deg); }
 tr.bc-detail { display: none; }
 tr.bc-detail.visible { display: table-row; }
 tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
+.brave-condition { color: #aaa; font-size: 13px; margin-bottom: 6px; }
+.brave-icon-wrap { position: relative; width: 32px; height: 32px; }
+.brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+.brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 </style>
 </head><body>
 <a class="back" href="/">← All Characters</a>
@@ -783,8 +891,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 <table>
 <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}} expandable{{end}}" onclick="toggleDetail(this)">
-  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}}<span class="chevron">&#9654;</span>{{end}}</td>
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -793,9 +901,45 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift}}
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .BraveCommand}}
 <tr class="sb-detail">
   <td colspan="8">
+    {{if .BraveCommand}}
+    <div class="burst-commands">
+      <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
+      <div class="brave-condition">Condition: {{.BraveCommand.Condition}} | School: {{.BraveCommand.School}}</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Level</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .BraveCommand.Levels}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td><div class="brave-icon-wrap"><img src="/images/brave/BraveAttack{{.Level}}.png" class="brave-bg"><img src="/images/brave/BraveBase.png" class="brave-fg"></div></td>
+          <td>{{.Level}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="8">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
     {{if .DualShift}}
     <div class="burst-commands">
       <div class="burst-title">Dual Shift</div>
@@ -1006,12 +1150,14 @@ func main() {
 	loadBurstCommands()
 	loadSynchroAbilities()
 	loadZenithAbilities()
+	loadBraveCommands()
 	loadStatuses()
 	matchSoulBreakEffects()
 	pairDualShifts()
 	matchBurstCommands()
 	matchSynchroAbilities()
 	matchZenithAbilities()
+	matchBraveCommands()
 
 	log.Println("Caching images...")
 	cacheAllImages()
