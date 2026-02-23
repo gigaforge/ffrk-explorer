@@ -1750,17 +1750,22 @@ func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 // ---------- additional effect matching ----------
 
-var critChanceRe = regexp.MustCompile(`\d+% Critical[\]\s\d]`)
-var critDamageRe = regexp.MustCompile(`Critical Damage \+\d+%`)
-var sbGaugeRe = regexp.MustCompile(`Soul Break Gauge \+`)
-var atbSpeedRe = regexp.MustCompile(`\d+% ATB`)
-var aegisCounterRe = regexp.MustCompile(`DEF, RES and MND -\d+%`)
-var fullbreakCounterRe = regexp.MustCompile(`ATK, DEF, MAG and RES \+\d+%`)
-var physJobBreakCounterRe = regexp.MustCompile(`ATK and MND \+\d+%, DEF and RES \+\d+%`)
-var magJobBreakCounterRe = regexp.MustCompile(`MAG and MND \+\d+%, DEF and RES \+\d+%`)
-var weaknessBoostRe = regexp.MustCompile(`Weakness \+\d+%`)
-var magicalBoostRe = regexp.MustCompile(`Magical \+\d+%`)
-var phyBoostRe = regexp.MustCompile(`PHY \+\d+%`)
+// containsCI performs a case-insensitive substring check.
+func containsCI(text, substr string) bool {
+	return strings.Contains(strings.ToLower(text), strings.ToLower(substr))
+}
+
+var critChanceRe = regexp.MustCompile(`(?i)\d+% critical[\]\s\d]`)
+var critDamageRe = regexp.MustCompile(`(?i)critical damage \+\d+%`)
+var sbGaugeRe = regexp.MustCompile(`(?i)soul break gauge \+`)
+var atbSpeedRe = regexp.MustCompile(`(?i)\d+% atb`)
+var aegisCounterRe = regexp.MustCompile(`(?i)def, res and mnd -\d+%`)
+var fullbreakCounterRe = regexp.MustCompile(`(?i)atk, def, mag and res \+\d+%`)
+var physJobBreakCounterRe = regexp.MustCompile(`(?i)atk and mnd \+\d+%, def and res \+\d+%`)
+var magJobBreakCounterRe = regexp.MustCompile(`(?i)mag and mnd \+\d+%, def and res \+\d+%`)
+var weaknessBoostRe = regexp.MustCompile(`(?i)weakness \+\d+%`)
+var magicalBoostRe = regexp.MustCompile(`(?i)magical \+\d+%`)
+var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
 
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
@@ -1777,26 +1782,26 @@ var effectCheckers = map[string]func(string) bool{
 		return magJobBreakCounterRe.MatchString(text)
 	},
 	"haste": func(text string) bool {
-		return strings.Contains(text, "[Haste]") || strings.Contains(text, "Haste]")
+		return containsCI(text, "[Haste]") || containsCI(text, "Haste]")
 	},
 	"protect": func(text string) bool {
-		return strings.Contains(text, "[Protect]") || strings.Contains(text, "Protect]")
+		return containsCI(text, "[Protect]") || containsCI(text, "Protect]")
 	},
 	"shell": func(text string) bool {
-		return strings.Contains(text, "[Shell]") || strings.Contains(text, "Shell]")
+		return containsCI(text, "[Shell]") || containsCI(text, "Shell]")
 	},
 	"last_stand": func(text string) bool {
-		return strings.Contains(text, "Last Stand")
+		return containsCI(text, "Last Stand")
 	},
 	"regen": func(text string) bool {
-		return strings.Contains(text, "[Regen]") || strings.Contains(text, "[High Regen]") ||
-			strings.Contains(text, "Regen]") || strings.Contains(text, "High Regen")
+		return containsCI(text, "[Regen]") || containsCI(text, "[High Regen]") ||
+			containsCI(text, "Regen]") || containsCI(text, "High Regen")
 	},
 	"regenga": func(text string) bool {
-		return strings.Contains(text, "Regenga")
+		return containsCI(text, "Regenga")
 	},
 	"astra": func(text string) bool {
-		return strings.Contains(text, "Astra")
+		return containsCI(text, "Astra")
 	},
 	"crit_chance": func(text string) bool {
 		return critChanceRe.MatchString(text)
@@ -1808,13 +1813,13 @@ var effectCheckers = map[string]func(string) bool{
 		return sbGaugeRe.MatchString(text)
 	},
 	"dualcast": func(text string) bool {
-		return strings.Contains(text, "Dualcast")
+		return containsCI(text, "Dualcast")
 	},
 	"triplecast": func(text string) bool {
-		return strings.Contains(text, "Triplecast")
+		return containsCI(text, "Triplecast")
 	},
 	"instant_atb": func(text string) bool {
-		return strings.Contains(text, "Instant ATB")
+		return containsCI(text, "Instant ATB")
 	},
 	"atb_speed": func(text string) bool {
 		return atbSpeedRe.MatchString(text)
@@ -1829,10 +1834,10 @@ var effectCheckers = map[string]func(string) bool{
 		return phyBoostRe.MatchString(text)
 	},
 	"deshell": func(text string) bool {
-		return strings.Contains(text, "Deshell")
+		return containsCI(text, "Deshell")
 	},
 	"deprotect": func(text string) bool {
-		return strings.Contains(text, "Deprotect")
+		return containsCI(text, "Deprotect")
 	},
 }
 
@@ -1922,16 +1927,16 @@ func haMatchesAdditionalEffects(ha HeroAbility, effects []string) bool {
 
 // textContainsAttach checks if text contains "Attach <element>" pattern
 func textContainsAttach(text, element string) bool {
-	return strings.Contains(text, "Attach "+element)
+	return containsCI(text, "Attach "+element)
 }
 
 // textContainsImperil checks if text contains "Imperil <element>" or "Imperil Prismatic"
 func textContainsImperil(text, element string) bool {
-	if strings.Contains(text, "Imperil "+element) {
+	if containsCI(text, "Imperil "+element) {
 		return true
 	}
 	// "Imperil Prismatic" matches any specific element
-	if element != "Prismatic" && strings.Contains(text, "Imperil Prismatic") {
+	if element != "Prismatic" && containsCI(text, "Imperil Prismatic") {
 		return true
 	}
 	return false
