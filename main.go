@@ -2009,7 +2009,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	var results []SearchResult
 	totalCount := 0
 	truncated := false
-	const maxResults = 100
+	const maxResults = 300
 
 	for _, c := range matchedChars {
 		if truncated {
