@@ -1,0 +1,279 @@
+{{define "search_bar"}}
+
+<div class="search-bar">
+  <label>Character</label>
+  <input type="text" id="char-input" list="char-list" placeholder="Name...">
+  <datalist id="char-list"></datalist>
+  <label>Realm</label>
+  <select id="realm-select">
+    <option value="">Any</option>
+    <option>I</option><option>II</option><option>III</option><option>IV</option>
+    <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
+    <option>IX</option><option>X</option><option>XI</option><option>XII</option>
+    <option>XIII</option><option>XIV</option><option>XV</option><option>XVI</option>
+    <option>FFT</option><option>Type-0</option><option>KH</option><option>Beyond</option><option>Core</option>
+  </select>
+  <label>SB Tier</label>
+  <select id="tier-select">
+    <option value="">Any</option>
+  </select>
+  <label>En-Element</label>
+  <select id="en-element-select">
+    <option value="">Any</option>
+    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+    <option>Poison</option>
+  </select>
+  <label>Imperil</label>
+  <select id="imperil-select">
+    <option value="">Any</option>
+    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+    <option>Poison</option><option>Prismatic</option>
+  </select>
+  <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="openSchoolsModal()">Job Requirements<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="doSearch()">Search</button>
+  <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only"> Owned only</label>
+  <div class="auth-area" id="auth-area"></div>
+</div>
+<div class="auth-modal-overlay" id="login-modal">
+  <div class="auth-modal">
+    <h3>Login</h3>
+    <div class="error-msg" id="login-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="login-username"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="login-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+<div class="auth-modal-overlay" id="register-modal">
+  <div class="auth-modal">
+    <h3>Register</h3>
+    <div class="error-msg" id="register-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="register-username"></div>
+    <div class="form-group"><label>Password (min 6 chars)</label><input type="password" id="register-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doRegister()">Register</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="effects-modal">
+  <div class="modal">
+    <h3>Additional Effects</h3>
+    <div class="modal-columns">
+      <div class="modal-col">
+        <label><input type="checkbox" value="aegis_counter"> Aegis Counter</label>
+        <label><input type="checkbox" value="fullbreak_counter"> Fullbreak Counter</label>
+        <label><input type="checkbox" value="phys_job_break_counter"> Phys Job Break Counter</label>
+        <label><input type="checkbox" value="mag_job_break_counter"> Mag Job Break Counter</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="haste"> Haste</label>
+        <label><input type="checkbox" value="protect"> Protect</label>
+        <label><input type="checkbox" value="shell"> Shell</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="last_stand"> Last Stand</label>
+        <label><input type="checkbox" value="regen"> Regen</label>
+        <label><input type="checkbox" value="regenga"> Regenga</label>
+        <label><input type="checkbox" value="astra"> Astra</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="crit_chance"> Critical Chance</label>
+        <label><input type="checkbox" value="crit_damage"> Critical Damage</label>
+        <label><input type="checkbox" value="sb_gauge"> SB Gauge</label>
+        <label><input type="checkbox" value="deshell"> Deshell</label>
+        <label><input type="checkbox" value="deprotect"> Deprotect</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="dualcast"> Dualcast</label>
+        <label><input type="checkbox" value="triplecast"> Triplecast</label>
+        <label><input type="checkbox" value="instant_atb"> Instant ATB</label>
+        <label><input type="checkbox" value="atb_speed"> ATB Speed</label>
+      </div>
+      <div class="modal-col">
+        <label><input type="checkbox" value="weakness_boost"> Weakness Boost</label>
+        <label><input type="checkbox" value="magical_boost"> Magical Boost</label>
+        <label><input type="checkbox" value="phy_boost"> PHY Boost</label>
+        <label><input type="checkbox" value="sorcery_boost"> Sorcery Damage Boost</label>
+        <label><input type="checkbox" value="pentabreak_boost"> Pentabreak Damage Boost</label>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="clearEffects()">Clear All</button>
+      <button onclick="closeEffectsModal()">Done</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="schools-modal">
+  <div class="modal">
+    <h3>Job Requirements</h3>
+    <div class="school-toggle">
+      <span>Match:</span>
+      <button id="school-mode-and" class="active" onclick="setSchoolMode('and')">ALL (AND)</button>
+      <button id="school-mode-or" onclick="setSchoolMode('or')">ANY (OR)</button>
+    </div>
+    <div class="school-grid">
+      <div class="school-row"><span>Black Magic</span><select data-school="Black Magic"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>White Magic</span><select data-school="White Magic"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Combat</span><select data-school="Combat"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Support</span><select data-school="Support"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Celerity</span><select data-school="Celerity"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Summoning</span><select data-school="Summoning"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Spellblade</span><select data-school="Spellblade"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Dragoon</span><select data-school="Dragoon"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Monk</span><select data-school="Monk"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Thief</span><select data-school="Thief"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Knight</span><select data-school="Knight"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Samurai</span><select data-school="Samurai"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Ninja</span><select data-school="Ninja"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Bard</span><select data-school="Bard"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Dancer</span><select data-school="Dancer"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Machinist</span><select data-school="Machinist"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Darkness</span><select data-school="Darkness"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Sharpshooter</span><select data-school="Sharpshooter"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Witch</span><select data-school="Witch"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+      <div class="school-row"><span>Heavy</span><select data-school="Heavy"><option value="">--</option><option value="1">1★</option><option value="2">2★</option><option value="3">3★</option><option value="4">4★</option><option value="5">5★</option><option value="6">6★</option></select></div>
+    </div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="clearSchools()">Clear All</button>
+      <button onclick="closeSchoolsModal()">Done</button>
+    </div>
+  </div>
+</div>
+<script>
+fetch('/api/characters').then(r=>r.json()).then(names=>{
+  var dl=document.getElementById('char-list');
+  names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o)});
+});
+fetch('/api/tiers').then(r=>r.json()).then(tiers=>{
+  var sel=document.getElementById('tier-select');
+  tiers.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o)});
+  var p=new URLSearchParams(window.location.search);
+  if(p.get('tier'))sel.value=p.get('tier');
+});
+function openEffectsModal(){document.getElementById('effects-modal').classList.add('visible')}
+function closeEffectsModal(){document.getElementById('effects-modal').classList.remove('visible');updateBadge()}
+function clearEffects(){
+  document.querySelectorAll('#effects-modal input[type=checkbox]').forEach(function(cb){cb.checked=false});
+  updateBadge();
+}
+function getCheckedEffects(){
+  var eff=[];
+  document.querySelectorAll('#effects-modal input[type=checkbox]:checked').forEach(function(cb){eff.push(cb.value)});
+  return eff;
+}
+function updateBadge(){
+  var eff=getCheckedEffects();
+  var badge=document.getElementById('effects-badge');
+  if(eff.length>0){badge.textContent=eff.length;badge.style.display='inline'}
+  else{badge.style.display='none'}
+}
+document.getElementById('effects-modal').addEventListener('click',function(e){
+  if(e.target===this)closeEffectsModal();
+});
+var schoolMode='and';
+function openSchoolsModal(){document.getElementById('schools-modal').classList.add('visible')}
+function closeSchoolsModal(){document.getElementById('schools-modal').classList.remove('visible');updateSchoolsBadge()}
+function clearSchools(){
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){s.value=''});
+  updateSchoolsBadge();
+}
+function setSchoolMode(mode){
+  schoolMode=mode;
+  document.getElementById('school-mode-and').classList.toggle('active',mode==='and');
+  document.getElementById('school-mode-or').classList.toggle('active',mode==='or');
+}
+function getSchoolFilters(){
+  var parts=[];
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){
+    if(s.value){parts.push(s.getAttribute('data-school')+':'+s.value)}
+  });
+  return parts.join(',');
+}
+function updateSchoolsBadge(){
+  var count=0;
+  document.querySelectorAll('#schools-modal select[data-school]').forEach(function(s){if(s.value)count++});
+  var badge=document.getElementById('schools-badge');
+  if(count>0){badge.textContent=count;badge.style.display='inline'}
+  else{badge.style.display='none'}
+}
+document.getElementById('schools-modal').addEventListener('click',function(e){
+  if(e.target===this)closeSchoolsModal();
+});
+function doSearch(){
+  var p=new URLSearchParams();
+  var c=document.getElementById('char-input').value;if(c)p.set('character',c);
+  var r=document.getElementById('realm-select').value;if(r)p.set('realm',r);
+  var t=document.getElementById('tier-select').value;if(t)p.set('tier',t);
+  var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
+  var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
+  var eff=getCheckedEffects();if(eff.length>0)p.set('effects',eff.join(','));
+  var sch=getSchoolFilters();if(sch)p.set('schools',sch);
+  if(schoolMode!=='and')p.set('schoolmode',schoolMode);
+  if(document.getElementById('owned-only').checked)p.set('owned','1');
+  window.location='/search?'+p.toString();
+}
+document.getElementById('char-input').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch()});
+document.getElementById('login-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModals()});
+document.getElementById('register-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModals()});
+document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('register-password').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
+function closeAuthModals(){document.getElementById('login-modal').classList.remove('visible');document.getElementById('register-modal').classList.remove('visible')}
+function showLogin(){document.getElementById('login-error').style.display='none';document.getElementById('login-modal').classList.add('visible');document.getElementById('login-username').focus()}
+function showRegister(){document.getElementById('register-error').style.display='none';document.getElementById('register-modal').classList.add('visible');document.getElementById('register-username').focus()}
+function renderAuth(username){
+  var area=document.getElementById('auth-area');
+  if(username){area.innerHTML='<span class="welcome">Welcome, '+username+'</span><button onclick="doLogout()">Logout</button>';document.getElementById('owned-filter').style.display=''}
+  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false}
+}
+function doLogin(){
+  var u=document.getElementById('login-username').value,p=document.getElementById('login-password').value;
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+    else{var e=document.getElementById('login-error');e.textContent=res.data.error||'Login failed';e.style.display='block'}});
+}
+function doRegister(){
+  var u=document.getElementById('register-username').value,p=document.getElementById('register-password').value;
+  fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+    else{var e=document.getElementById('register-error');e.textContent=res.data.error||'Registration failed';e.style.display='block'}});
+}
+function doLogout(){
+  fetch('/api/logout',{method:'POST'}).then(function(){renderAuth(null);window.__currentUser=null;if(typeof onAuthChange==='function')onAuthChange()});
+}
+fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(function(d){if(d&&d.username){renderAuth(d.username);window.__currentUser=d.username}else{renderAuth(null)}});
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  if(p.get('character'))document.getElementById('char-input').value=p.get('character');
+  if(p.get('realm'))document.getElementById('realm-select').value=p.get('realm');
+  if(p.get('element'))document.getElementById('en-element-select').value=p.get('element');
+  if(p.get('imperil'))document.getElementById('imperil-select').value=p.get('imperil');
+  if(p.get('effects')){
+    var eff=p.get('effects').split(',');
+    eff.forEach(function(v){
+      var cb=document.querySelector('#effects-modal input[value="'+v+'"]');
+      if(cb)cb.checked=true;
+    });
+    updateBadge();
+  }
+  if(p.get('owned')==='1')document.getElementById('owned-only').checked=true;
+  if(p.get('schools')){
+    p.get('schools').split(',').forEach(function(pair){
+      var parts=pair.split(':');if(parts.length===2){
+        var sel=document.querySelector('#schools-modal select[data-school="'+parts[0]+'"]');
+        if(sel)sel.value=parts[1];
+      }
+    });
+    updateSchoolsBadge();
+  }
+  if(p.get('schoolmode')==='or')setSchoolMode('or');
+})();
+</script>
+{{end}}

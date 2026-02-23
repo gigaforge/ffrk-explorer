@@ -1,0 +1,62 @@
+{{define "search_bar_css"}}
+
+.search-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+              background: #16213e; border-bottom: 2px solid #0f3460;
+              padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px;
+              align-items: center; }
+.search-bar input, .search-bar select { background: #1a1a2e; color: #e0e0e0;
+              border: 1px solid #0f3460; border-radius: 4px; padding: 6px 10px;
+              font-size: 14px; }
+.search-bar input:focus, .search-bar select:focus { outline: none; border-color: #e94560; }
+.search-bar input[type="text"] { width: 180px; }
+.search-bar select { min-width: 100px; }
+.search-bar button { background: #e94560; color: #fff; border: none; border-radius: 4px;
+                     padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.search-bar button:hover { background: #d63050; }
+.search-bar label { color: #888; font-size: 12px; margin-right: -4px; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                 background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.visible { display: flex; }
+.modal { background: #16213e; border: 2px solid #0f3460; border-radius: 8px;
+         padding: 20px; min-width: 500px; max-width: 90vw; }
+.modal h3 { color: #e94560; margin-bottom: 12px; }
+.modal-columns { display: flex; gap: 24px; flex-wrap: wrap; }
+.modal-col { display: flex; flex-direction: column; gap: 8px; min-width: 120px; }
+.modal-col label { color: #e0e0e0; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.modal-col input[type="checkbox"] { accent-color: #e94560; }
+.modal-buttons { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+.modal-buttons button { background: #e94560; color: #fff; border: none; border-radius: 4px;
+                        padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.modal-buttons button:hover { background: #d63050; }
+.modal-buttons button.secondary { background: #0f3460; }
+.modal-buttons button.secondary:hover { background: #1a3a6e; }
+.effects-badge { background: #0f3460; color: #e94560; border-radius: 10px; padding: 1px 7px;
+                 font-size: 11px; margin-left: 4px; }
+#owned-filter { color: #e0e0e0; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.school-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 16px; }
+.school-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.school-row span { color: #e0e0e0; font-size: 13px; white-space: nowrap; }
+.school-row select { background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+                     border-radius: 4px; padding: 2px 4px; font-size: 12px; }
+.school-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #e0e0e0; font-size: 14px; }
+.school-toggle button { padding: 4px 12px; font-size: 12px; border: 1px solid #0f3460;
+                        border-radius: 4px; cursor: pointer; background: #1a1a2e; color: #e0e0e0; }
+.school-toggle button.active { background: #e94560; border-color: #e94560; color: #fff; }
+#owned-filter input[type="checkbox"] { accent-color: #e94560; cursor: pointer; }
+.search-bar .auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.search-bar .auth-area .welcome { color: #e0e0e0; font-size: 14px; }
+.search-bar .auth-area button { font-size: 13px; padding: 5px 12px; }
+.auth-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                      background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+.auth-modal-overlay.visible { display: flex; }
+.auth-modal { background: #16213e; border: 2px solid #0f3460; border-radius: 8px;
+              padding: 24px; min-width: 320px; max-width: 90vw; }
+.auth-modal h3 { color: #e94560; margin-bottom: 16px; }
+.auth-modal .form-group { margin-bottom: 12px; }
+.auth-modal label { display: block; color: #e0e0e0; font-size: 14px; margin-bottom: 4px; }
+.auth-modal input[type="text"], .auth-modal input[type="password"] {
+    width: 100%; background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+    border-radius: 4px; padding: 8px 10px; font-size: 14px; box-sizing: border-box; }
+.auth-modal .error-msg { color: #e94560; font-size: 13px; margin-bottom: 8px; display: none; }
+.auth-modal .modal-buttons { margin-top: 16px; }
+{{end}}
