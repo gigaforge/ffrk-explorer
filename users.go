@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -37,24 +36,12 @@ func initUserData() {
 	os.MkdirAll("data", 0o755)
 	os.MkdirAll(soulbreaksDir, 0o755)
 
-	// Try loading from JSON first
 	if _, err := os.Stat(usersJSON); err == nil {
 		loadUsersJSON(usersJSON)
 		loadAllUserSoulbreaks()
-		loadSessions()
-		return
+	} else {
+		log.Println("No user data found, starting fresh")
 	}
-
-	// Try importing from CSV
-	if _, err := os.Stat(csvPath("users.csv")); err == nil {
-		importUsersFromCSV()
-		saveUsersJSON(usersJSON)
-		saveAllUserSoulbreaks()
-		loadSessions()
-		return
-	}
-
-	log.Println("No user data found, starting fresh")
 	loadSessions()
 }
 
@@ -195,87 +182,6 @@ func saveAllUserSoulbreaks() {
 	for uid := range userSoulbreaks {
 		saveUserSoulbreaksForUser(uid)
 	}
-}
-
-func importUsersFromCSV() {
-	log.Println("Importing users from CSV...")
-
-	// Read users.csv: id, username, bcrypt_hash, api_key (no headers)
-	f, err := os.Open(csvPath("users.csv"))
-	if err != nil {
-		log.Printf("WARNING: could not open users.csv: %v", err)
-		return
-	}
-	defer f.Close()
-	r := csv.NewReader(f)
-	r.LazyQuotes = true
-	records, err := r.ReadAll()
-	if err != nil {
-		log.Printf("WARNING: could not read users.csv: %v", err)
-		return
-	}
-	for _, rec := range records {
-		if len(rec) < 4 {
-			continue
-		}
-		id, err := strconv.Atoi(strings.TrimSpace(rec[0]))
-		if err != nil {
-			continue
-		}
-		u := &User{
-			ID:           id,
-			Username:     strings.TrimSpace(rec[1]),
-			PasswordHash: strings.TrimSpace(rec[2]),
-			APIKey:       strings.TrimSpace(rec[3]),
-		}
-		users[u.ID] = u
-		usersByName[strings.ToLower(u.Username)] = u
-		if u.APIKey != "" {
-			usersByAPI[u.APIKey] = u
-		}
-		if u.ID >= nextUserID {
-			nextUserID = u.ID + 1
-		}
-	}
-	log.Printf("Imported %d users from CSV", len(users))
-
-	// Read user_soulbreaks.csv: user_id, soulbreak_id (no headers)
-	if _, err := os.Stat(csvPath("user_soulbreaks.csv")); err != nil {
-		return
-	}
-	f2, err := os.Open(csvPath("user_soulbreaks.csv"))
-	if err != nil {
-		log.Printf("WARNING: could not open user_soulbreaks.csv: %v", err)
-		return
-	}
-	defer f2.Close()
-	r2 := csv.NewReader(f2)
-	r2.LazyQuotes = true
-	records2, err := r2.ReadAll()
-	if err != nil {
-		log.Printf("WARNING: could not read user_soulbreaks.csv: %v", err)
-		return
-	}
-	count := 0
-	for _, rec := range records2 {
-		if len(rec) < 2 {
-			continue
-		}
-		uid, err := strconv.Atoi(strings.TrimSpace(rec[0]))
-		if err != nil {
-			continue
-		}
-		sbID := strings.TrimSpace(rec[1])
-		if sbID == "" {
-			continue
-		}
-		if userSoulbreaks[uid] == nil {
-			userSoulbreaks[uid] = make(map[string]bool)
-		}
-		userSoulbreaks[uid][sbID] = true
-		count++
-	}
-	log.Printf("Imported %d soulbreak ownership records from CSV", count)
 }
 
 // ---------- session management ----------

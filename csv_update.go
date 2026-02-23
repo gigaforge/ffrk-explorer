@@ -82,6 +82,31 @@ func countCSVRows(filename string) int {
 	return len(records) - 1
 }
 
+func ensureCSVs() {
+	if err := os.MkdirAll(csvDir, 0o755); err != nil {
+		log.Fatalf("Failed to create data directory %s: %v", csvDir, err)
+	}
+	for _, sheet := range csvSheets {
+		path := csvPath(sheet.Filename)
+		if _, err := os.Stat(path); err == nil {
+			continue
+		}
+		log.Printf("Missing %s, downloading...", sheet.Filename)
+		url := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
+		data, err := downloadCSV(url)
+		if err != nil {
+			log.Fatalf("Failed to download %s: %v", sheet.Filename, err)
+		}
+		if err := validateCSV(data, sheet.ExpectedHeaders, 0); err != nil {
+			log.Fatalf("Validation failed for %s: %v", sheet.Filename, err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			log.Fatalf("Failed to write %s: %v", path, err)
+		}
+		log.Printf("Downloaded %s (%d bytes)", sheet.Filename, len(data))
+	}
+}
+
 func updateCSVs() {
 	anyUpdated := false
 	for _, sheet := range csvSheets {

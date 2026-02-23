@@ -10,6 +10,8 @@ import (
 // ---------- main ----------
 
 func main() {
+	ensureCSVs()
+
 	log.Println("Loading data...")
 	reloadData()
 
