@@ -1365,8 +1365,9 @@ function toggleBcDetail(row) {
 </body></html>`))
 
 type SearchData struct {
-	Results   []SearchResult
-	Truncated bool
+	Results    []SearchResult
+	Truncated  bool
+	MaxResults int
 	Query     struct {
 		Character string
 		Realm     string
@@ -1442,7 +1443,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </head><body>
 ` + searchBarHTML + `
 <h1>Search Results</h1>
-{{if .Truncated}}<div class="warning">Results truncated to 100 items. Try narrowing your search.</div>{{end}}
+{{if .Truncated}}<div class="warning">Results truncated to {{.MaxResults}} items. Try narrowing your search.</div>{{end}}
 {{if not .Results}}<div class="no-results">No results found.</div>{{end}}
 {{range .Results}}
 <div class="char-header">
@@ -2101,8 +2102,9 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := SearchData{
-		Results:   results,
-		Truncated: truncated,
+		Results:    results,
+		Truncated:  truncated,
+		MaxResults: maxResults,
 	}
 	data.Query.Character = charFilter
 	data.Query.Realm = realmFilter
