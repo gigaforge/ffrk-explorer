@@ -1040,6 +1040,8 @@ const searchBarHTML = `
         <label><input type="checkbox" value="crit_chance"> Critical Chance</label>
         <label><input type="checkbox" value="crit_damage"> Critical Damage</label>
         <label><input type="checkbox" value="sb_gauge"> SB Gauge</label>
+        <label><input type="checkbox" value="deshell"> Deshell</label>
+        <label><input type="checkbox" value="deprotect"> Deprotect</label>
       </div>
       <div class="modal-col">
         <label><input type="checkbox" value="dualcast"> Dualcast</label>
@@ -1051,8 +1053,8 @@ const searchBarHTML = `
         <label><input type="checkbox" value="weakness_boost"> Weakness Boost</label>
         <label><input type="checkbox" value="magical_boost"> Magical Boost</label>
         <label><input type="checkbox" value="phy_boost"> PHY Boost</label>
-        <label><input type="checkbox" value="deshell"> Deshell</label>
-        <label><input type="checkbox" value="deprotect"> Deprotect</label>
+        <label><input type="checkbox" value="sorcery_boost"> Sorcery Damage Boost</label>
+        <label><input type="checkbox" value="pentabreak_boost"> Pentabreak Damage Boost</label>
       </div>
     </div>
     <div class="modal-buttons">
@@ -1919,6 +1921,8 @@ var magJobBreakCounterRe = regexp.MustCompile(`(?i)mag and mnd \+\d+%, def and r
 var weaknessBoostRe = regexp.MustCompile(`(?i)weakness \+\d+%`)
 var magicalBoostRe = regexp.MustCompile(`(?i)magical \+\d+%`)
 var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
+var sorceryBoostRe = regexp.MustCompile(`(?i)sorcery damage \+\d+%`)
+var pentabreakBoostRe = regexp.MustCompile(`(?i)pentabreak damage boost`)
 
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
@@ -1985,6 +1989,12 @@ var effectCheckers = map[string]func(string) bool{
 	},
 	"phy_boost": func(text string) bool {
 		return phyBoostRe.MatchString(text)
+	},
+	"sorcery_boost": func(text string) bool {
+		return sorceryBoostRe.MatchString(text)
+	},
+	"pentabreak_boost": func(text string) bool {
+		return pentabreakBoostRe.MatchString(text)
 	},
 	"deshell": func(text string) bool {
 		return containsCI(text, "Deshell")
