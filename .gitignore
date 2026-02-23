@@ -1,3 +1,6 @@
 ffrk-server
 .env
 images/
+users.csv
+user_soulbreaks.csv
+data/

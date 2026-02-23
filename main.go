@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -17,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ---------- data types ----------
@@ -139,9 +145,11 @@ type RealmGroup struct {
 }
 
 type CharDetail struct {
-	Character     Character
-	SoulBreaks    []SoulBreak
-	HeroAbilities []HeroAbility
+	Character       Character
+	SoulBreaks      []SoulBreak
+	HeroAbilities   []HeroAbility
+	LoggedIn        bool
+	OwnedSoulbreaks map[string]bool
 }
 
 // ---------- globals ----------
@@ -158,6 +166,24 @@ var (
 	realmGroups   []RealmGroup
 	charByID      map[string]*Character
 	dataLock      sync.RWMutex
+)
+
+// ---------- user types & globals ----------
+
+type User struct {
+	ID           int    `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	APIKey       string `json:"api_key"`
+}
+
+var (
+	users          map[int]*User          // id → user
+	usersByName    map[string]*User       // lowercase username → user
+	userSoulbreaks map[int]map[string]bool // user_id → set of soulbreak IDs
+	sessions       map[string]int          // session_token → user_id
+	userLock       sync.RWMutex
+	nextUserID     int
 )
 
 // ---------- CSV auto-update ----------
@@ -938,6 +964,480 @@ func cacheAllImages() {
 	wg.Wait()
 }
 
+// ---------- user data persistence ----------
+
+const soulbreaksDir = "data/soulbreaks"
+
+func initUserData() {
+	users = make(map[int]*User)
+	usersByName = make(map[string]*User)
+	userSoulbreaks = make(map[int]map[string]bool)
+	sessions = make(map[string]int)
+	nextUserID = 1
+
+	usersJSON := "data/users.json"
+
+	os.MkdirAll("data", 0o755)
+	os.MkdirAll(soulbreaksDir, 0o755)
+
+	// Try loading from JSON first
+	if _, err := os.Stat(usersJSON); err == nil {
+		loadUsersJSON(usersJSON)
+		loadAllUserSoulbreaks()
+		return
+	}
+
+	// Try importing from CSV
+	if _, err := os.Stat("users.csv"); err == nil {
+		importUsersFromCSV()
+		saveUsersJSON(usersJSON)
+		saveAllUserSoulbreaks()
+		return
+	}
+
+	log.Println("No user data found, starting fresh")
+}
+
+func loadUsersJSON(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("WARNING: could not read %s: %v", path, err)
+		return
+	}
+	var userList []User
+	if err := json.Unmarshal(data, &userList); err != nil {
+		log.Printf("WARNING: could not parse %s: %v", path, err)
+		return
+	}
+	for i := range userList {
+		u := &userList[i]
+		users[u.ID] = u
+		usersByName[strings.ToLower(u.Username)] = u
+		if u.ID >= nextUserID {
+			nextUserID = u.ID + 1
+		}
+	}
+	log.Printf("Loaded %d users from %s", len(users), path)
+}
+
+func loadAllUserSoulbreaks() {
+	entries, err := os.ReadDir(soulbreaksDir)
+	if err != nil {
+		log.Printf("WARNING: could not read %s: %v", soulbreaksDir, err)
+		return
+	}
+	total := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		uidStr := strings.TrimSuffix(name, ".json")
+		uid, err := strconv.Atoi(uidStr)
+		if err != nil {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(soulbreaksDir, name))
+		if err != nil {
+			log.Printf("WARNING: could not read %s: %v", name, err)
+			continue
+		}
+		var ids []string
+		if err := json.Unmarshal(data, &ids); err != nil {
+			log.Printf("WARNING: could not parse %s: %v", name, err)
+			continue
+		}
+		set := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			set[id] = true
+		}
+		userSoulbreaks[uid] = set
+		total += len(ids)
+	}
+	log.Printf("Loaded %d user soulbreak records from %s/", total, soulbreaksDir)
+}
+
+func saveUsersJSON(path string) {
+	var userList []User
+	for _, u := range users {
+		userList = append(userList, *u)
+	}
+	sort.Slice(userList, func(i, j int) bool { return userList[i].ID < userList[j].ID })
+	data, err := json.Marshal(userList)
+	if err != nil {
+		log.Printf("WARNING: could not marshal users: %v", err)
+		return
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		log.Printf("WARNING: could not write %s: %v", path, err)
+	}
+}
+
+func saveUserSoulbreaksForUser(uid int) {
+	set := userSoulbreaks[uid]
+	path := filepath.Join(soulbreaksDir, strconv.Itoa(uid)+".json")
+	if len(set) == 0 {
+		os.Remove(path)
+		return
+	}
+	ids := make([]string, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	data, err := json.Marshal(ids)
+	if err != nil {
+		log.Printf("WARNING: could not marshal soulbreaks for user %d: %v", uid, err)
+		return
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		log.Printf("WARNING: could not write %s: %v", path, err)
+	}
+}
+
+func saveAllUserSoulbreaks() {
+	for uid := range userSoulbreaks {
+		saveUserSoulbreaksForUser(uid)
+	}
+}
+
+func importUsersFromCSV() {
+	log.Println("Importing users from CSV...")
+
+	// Read users.csv: id, username, bcrypt_hash, api_key (no headers)
+	f, err := os.Open("users.csv")
+	if err != nil {
+		log.Printf("WARNING: could not open users.csv: %v", err)
+		return
+	}
+	defer f.Close()
+	r := csv.NewReader(f)
+	r.LazyQuotes = true
+	records, err := r.ReadAll()
+	if err != nil {
+		log.Printf("WARNING: could not read users.csv: %v", err)
+		return
+	}
+	for _, rec := range records {
+		if len(rec) < 4 {
+			continue
+		}
+		id, err := strconv.Atoi(strings.TrimSpace(rec[0]))
+		if err != nil {
+			continue
+		}
+		u := &User{
+			ID:           id,
+			Username:     strings.TrimSpace(rec[1]),
+			PasswordHash: strings.TrimSpace(rec[2]),
+			APIKey:       strings.TrimSpace(rec[3]),
+		}
+		users[u.ID] = u
+		usersByName[strings.ToLower(u.Username)] = u
+		if u.ID >= nextUserID {
+			nextUserID = u.ID + 1
+		}
+	}
+	log.Printf("Imported %d users from CSV", len(users))
+
+	// Read user_soulbreaks.csv: user_id, soulbreak_id (no headers)
+	if _, err := os.Stat("user_soulbreaks.csv"); err != nil {
+		return
+	}
+	f2, err := os.Open("user_soulbreaks.csv")
+	if err != nil {
+		log.Printf("WARNING: could not open user_soulbreaks.csv: %v", err)
+		return
+	}
+	defer f2.Close()
+	r2 := csv.NewReader(f2)
+	r2.LazyQuotes = true
+	records2, err := r2.ReadAll()
+	if err != nil {
+		log.Printf("WARNING: could not read user_soulbreaks.csv: %v", err)
+		return
+	}
+	count := 0
+	for _, rec := range records2 {
+		if len(rec) < 2 {
+			continue
+		}
+		uid, err := strconv.Atoi(strings.TrimSpace(rec[0]))
+		if err != nil {
+			continue
+		}
+		sbID := strings.TrimSpace(rec[1])
+		if sbID == "" {
+			continue
+		}
+		if userSoulbreaks[uid] == nil {
+			userSoulbreaks[uid] = make(map[string]bool)
+		}
+		userSoulbreaks[uid][sbID] = true
+		count++
+	}
+	log.Printf("Imported %d soulbreak ownership records from CSV", count)
+}
+
+// ---------- session management ----------
+
+func generateSessionToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		log.Fatalf("crypto/rand failed: %v", err)
+	}
+	return hex.EncodeToString(b)
+}
+
+func hashPassword(password string) string {
+	h := sha256.Sum256([]byte(password + "ffrk"))
+	return hex.EncodeToString(h[:])
+}
+
+func createSession(w http.ResponseWriter, userID int) {
+	token := generateSessionToken()
+	userLock.Lock()
+	sessions[token] = userID
+	userLock.Unlock()
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   30 * 24 * 60 * 60,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func getCurrentUser(r *http.Request) *User {
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		return nil
+	}
+	userLock.RLock()
+	defer userLock.RUnlock()
+	uid, ok := sessions[cookie.Value]
+	if !ok {
+		return nil
+	}
+	return users[uid]
+}
+
+// ---------- auth API handlers ----------
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	req.Password = strings.TrimSpace(req.Password)
+	if req.Username == "" || req.Password == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Username and password are required"})
+		return
+	}
+
+	userLock.RLock()
+	u := usersByName[strings.ToLower(req.Username)]
+	userLock.RUnlock()
+	if u == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		return
+	}
+
+	sha256Hex := hashPassword(req.Password)
+	// PHP uses $2y$ prefix; Go's bcrypt accepts $2a$ — replace prefix for compat
+	storedHash := strings.Replace(u.PasswordHash, "$2y$", "$2a$", 1)
+	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(sha256Hex)); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		return
+	}
+
+	createSession(w, u.ID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+}
+
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	req.Password = strings.TrimSpace(req.Password)
+	if req.Username == "" || len(req.Password) < 6 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Username required, password must be at least 6 characters"})
+		return
+	}
+	if len(req.Username) > 50 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Username too long (max 50 characters)"})
+		return
+	}
+
+	userLock.Lock()
+	if _, exists := usersByName[strings.ToLower(req.Username)]; exists {
+		userLock.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Username already taken"})
+		return
+	}
+
+	sha256Hex := hashPassword(req.Password)
+	hash, err := bcrypt.GenerateFromPassword([]byte(sha256Hex), bcrypt.DefaultCost)
+	if err != nil {
+		userLock.Unlock()
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	apiKey := fmt.Sprintf("%x", md5.Sum([]byte(time.Now().String()+req.Username)))
+	u := &User{
+		ID:           nextUserID,
+		Username:     req.Username,
+		PasswordHash: string(hash),
+		APIKey:       apiKey,
+	}
+	nextUserID++
+	users[u.ID] = u
+	usersByName[strings.ToLower(u.Username)] = u
+	userLock.Unlock()
+
+	saveUsersJSON("data/users.json")
+	createSession(w, u.ID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	cookie, err := r.Cookie("session")
+	if err == nil {
+		userLock.Lock()
+		delete(sessions, cookie.Value)
+		userLock.Unlock()
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+}
+
+func meHandler(w http.ResponseWriter, r *http.Request) {
+	u := getCurrentUser(r)
+	if u == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+}
+
+func userSoulbreaksGetHandler(w http.ResponseWriter, r *http.Request) {
+	u := getCurrentUser(r)
+	if u == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		return
+	}
+	userLock.RLock()
+	owned := userSoulbreaks[u.ID]
+	var ids []string
+	for id := range owned {
+		ids = append(ids, id)
+	}
+	userLock.RUnlock()
+	sort.Strings(ids)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ids)
+}
+
+func userSoulbreaksPostHandler(w http.ResponseWriter, r *http.Request) {
+	u := getCurrentUser(r)
+	if u == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		return
+	}
+	var req struct {
+		SoulbreakID string `json:"soulbreak_id"`
+		Owned       bool   `json:"owned"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if req.SoulbreakID == "" {
+		http.Error(w, "soulbreak_id required", http.StatusBadRequest)
+		return
+	}
+
+	userLock.Lock()
+	if userSoulbreaks[u.ID] == nil {
+		userSoulbreaks[u.ID] = make(map[string]bool)
+	}
+	if req.Owned {
+		userSoulbreaks[u.ID][req.SoulbreakID] = true
+	} else {
+		delete(userSoulbreaks[u.ID], req.SoulbreakID)
+	}
+	userLock.Unlock()
+
+	saveUserSoulbreaksForUser(u.ID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+}
+
+func userSoulbreaksHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		userSoulbreaksGetHandler(w, r)
+	case http.MethodPost:
+		userSoulbreaksPostHandler(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // ---------- templates ----------
 
 const searchBarCSS = `
@@ -973,6 +1473,24 @@ const searchBarCSS = `
 .modal-buttons button.secondary:hover { background: #1a3a6e; }
 .effects-badge { background: #0f3460; color: #e94560; border-radius: 10px; padding: 1px 7px;
                  font-size: 11px; margin-left: 4px; }
+#owned-filter { color: #e0e0e0; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+#owned-filter input[type="checkbox"] { accent-color: #e94560; cursor: pointer; }
+.search-bar .auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.search-bar .auth-area .welcome { color: #e0e0e0; font-size: 14px; }
+.search-bar .auth-area button { font-size: 13px; padding: 5px 12px; }
+.auth-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                      background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
+.auth-modal-overlay.visible { display: flex; }
+.auth-modal { background: #16213e; border: 2px solid #0f3460; border-radius: 8px;
+              padding: 24px; min-width: 320px; max-width: 90vw; }
+.auth-modal h3 { color: #e94560; margin-bottom: 16px; }
+.auth-modal .form-group { margin-bottom: 12px; }
+.auth-modal label { display: block; color: #e0e0e0; font-size: 14px; margin-bottom: 4px; }
+.auth-modal input[type="text"], .auth-modal input[type="password"] {
+    width: 100%; background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460;
+    border-radius: 4px; padding: 8px 10px; font-size: 14px; box-sizing: border-box; }
+.auth-modal .error-msg { color: #e94560; font-size: 13px; margin-bottom: 8px; display: none; }
+.auth-modal .modal-buttons { margin-top: 16px; }
 `
 
 const searchBarHTML = `
@@ -1014,6 +1532,32 @@ const searchBarHTML = `
   </select>
   <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
   <button onclick="doSearch()">Search</button>
+  <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only"> Owned only</label>
+  <div class="auth-area" id="auth-area"></div>
+</div>
+<div class="auth-modal-overlay" id="login-modal">
+  <div class="auth-modal">
+    <h3>Login</h3>
+    <div class="error-msg" id="login-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="login-username"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="login-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+<div class="auth-modal-overlay" id="register-modal">
+  <div class="auth-modal">
+    <h3>Register</h3>
+    <div class="error-msg" id="register-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="register-username"></div>
+    <div class="form-group"><label>Password (min 6 chars)</label><input type="password" id="register-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doRegister()">Register</button>
+    </div>
+  </div>
 </div>
 <div class="modal-overlay" id="effects-modal">
   <div class="modal">
@@ -1096,9 +1640,40 @@ function doSearch(){
   var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
   var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
   var eff=getCheckedEffects();if(eff.length>0)p.set('effects',eff.join(','));
+  if(document.getElementById('owned-only').checked)p.set('owned','1');
   window.location='/search?'+p.toString();
 }
 document.getElementById('char-input').addEventListener('keydown',function(e){if(e.key==='Enter')doSearch()});
+document.getElementById('login-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModals()});
+document.getElementById('register-modal').addEventListener('click',function(e){if(e.target===this)closeAuthModals()});
+document.getElementById('login-password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('register-password').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister()});
+function closeAuthModals(){document.getElementById('login-modal').classList.remove('visible');document.getElementById('register-modal').classList.remove('visible')}
+function showLogin(){document.getElementById('login-error').style.display='none';document.getElementById('login-modal').classList.add('visible');document.getElementById('login-username').focus()}
+function showRegister(){document.getElementById('register-error').style.display='none';document.getElementById('register-modal').classList.add('visible');document.getElementById('register-username').focus()}
+function renderAuth(username){
+  var area=document.getElementById('auth-area');
+  if(username){area.innerHTML='<span class="welcome">Welcome, '+username+'</span><button onclick="doLogout()">Logout</button>';document.getElementById('owned-filter').style.display=''}
+  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false}
+}
+function doLogin(){
+  var u=document.getElementById('login-username').value,p=document.getElementById('login-password').value;
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+    else{var e=document.getElementById('login-error');e.textContent=res.data.error||'Login failed';e.style.display='block'}});
+}
+function doRegister(){
+  var u=document.getElementById('register-username').value,p=document.getElementById('register-password').value;
+  fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+    else{var e=document.getElementById('register-error');e.textContent=res.data.error||'Registration failed';e.style.display='block'}});
+}
+function doLogout(){
+  fetch('/api/logout',{method:'POST'}).then(function(){renderAuth(null);window.__currentUser=null;if(typeof onAuthChange==='function')onAuthChange()});
+}
+fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(function(d){if(d&&d.username){renderAuth(d.username);window.__currentUser=d.username}else{renderAuth(null)}});
 (function(){
   var p=new URLSearchParams(window.location.search);
   if(p.get('character'))document.getElementById('char-input').value=p.get('character');
@@ -1114,6 +1689,7 @@ document.getElementById('char-input').addEventListener('keydown',function(e){if(
     });
     updateBadge();
   }
+  if(p.get('owned')==='1')document.getElementById('owned-only').checked=true;
 })();
 </script>
 `
@@ -1228,6 +1804,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap { position: relative; width: 32px; height: 32px; }
 .brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+td.sb-owned { width: 24px; padding: 4px; text-align: center; }
+td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; width: 16px; height: 16px; }
 </style>
 </head><body>
 ` + searchBarHTML + `
@@ -1262,9 +1840,10 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 {{if .SoulBreaks}}
 <h2>Soul Breaks ({{len .SoulBreaks}})</h2>
 <table>
-<tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+<tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
 <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
+  {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()"><input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}></td>{{end}}
   <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
@@ -1276,7 +1855,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </tr>
 {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}
 <tr class="sb-detail">
-  <td colspan="8">
+  <td colspan="{{if $.LoggedIn}}9{{else}}8{{end}}">
     {{if .BraveCommand}}
     <div class="burst-commands">
       <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
@@ -1514,14 +2093,22 @@ function toggleBcDetail(row) {
   detail.classList.toggle('visible');
   event.stopPropagation();
 }
+function toggleOwned(cb){
+  var id=cb.getAttribute('data-sbid'),owned=cb.checked;
+  fetch('/api/user/soulbreaks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({soulbreak_id:id,owned:owned})})
+  .then(function(r){if(!r.ok){cb.checked=!owned}});
+}
+function onAuthChange(){window.location.reload()}
 </script>
 </body></html>`))
 
 type SearchData struct {
-	Results    []SearchResult
-	Truncated  bool
-	MaxResults int
-	Query     struct {
+	Results         []SearchResult
+	Truncated       bool
+	MaxResults      int
+	LoggedIn        bool
+	OwnedSoulbreaks map[string]bool
+	Query           struct {
 		Character string
 		Realm     string
 		Tier      string
@@ -1592,6 +2179,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap { position: relative; width: 32px; height: 32px; }
 .brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+td.sb-owned { width: 24px; padding: 4px; text-align: center; }
+td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; width: 16px; height: 16px; }
 </style>
 </head><body>
 ` + searchBarHTML + `
@@ -1622,9 +2211,10 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 
 {{if .SoulBreaks}}
 <table>
-<tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+<tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
 <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
+  {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()"><input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}></td>{{end}}
   <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
@@ -1636,7 +2226,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </tr>
 {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}
 <tr class="sb-detail">
-  <td colspan="8">
+  <td colspan="{{if $.LoggedIn}}9{{else}}8{{end}}">
     {{if .BraveCommand}}
     <div class="burst-commands">
       <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
@@ -1876,6 +2466,12 @@ function toggleBcDetail(row) {
   detail.classList.toggle('visible');
   event.stopPropagation();
 }
+function toggleOwned(cb){
+  var id=cb.getAttribute('data-sbid'),owned=cb.checked;
+  fetch('/api/user/soulbreaks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({soulbreak_id:id,owned:owned})})
+  .then(function(r){if(!r.ok){cb.checked=!owned}});
+}
+function onAuthChange(){window.location.reload()}
 </script>
 </body></html>`))
 
@@ -2172,6 +2768,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	elementFilter := r.URL.Query().Get("element")
 	imperilFilter := r.URL.Query().Get("imperil")
 	effectsParam := r.URL.Query().Get("effects")
+	ownedOnly := r.URL.Query().Get("owned") == "1"
 
 	var additionalEffects []string
 	if effectsParam != "" {
@@ -2185,6 +2782,18 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	hasEffectFilter := elementFilter != "" || imperilFilter != "" || len(additionalEffects) > 0
 	hasSBFilter := tierFilter != "" || hasEffectFilter
+
+	// Get owned soulbreaks for filtering
+	u := getCurrentUser(r)
+	var ownedSet map[string]bool
+	if u != nil {
+		userLock.RLock()
+		ownedSet = userSoulbreaks[u.ID]
+		userLock.RUnlock()
+	}
+	if ownedOnly && (u == nil || ownedSet == nil) {
+		ownedOnly = false
+	}
 
 	// Filter characters
 	var matchedChars []Character
@@ -2215,6 +2824,9 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		// Collect matching soul breaks
 		var matchedSBs []SoulBreak
 		for _, sb := range soulBreaks[c.Name] {
+			if ownedOnly && !ownedSet[sb.ID] {
+				continue
+			}
 			if tierFilter != "" && sb.Tier != tierFilter {
 				continue
 			}
@@ -2290,6 +2902,16 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	data.Query.Element = elementFilter
 	data.Query.Imperil = imperilFilter
 
+	if u != nil {
+		data.LoggedIn = true
+		if ownedSet == nil {
+			ownedSet = make(map[string]bool)
+		}
+		data.OwnedSoulbreaks = ownedSet
+	} else {
+		data.OwnedSoulbreaks = make(map[string]bool)
+	}
+
 	searchTmpl.Execute(w, data)
 }
 
@@ -2308,6 +2930,21 @@ func charHandler(w http.ResponseWriter, r *http.Request) {
 		SoulBreaks:    soulBreaks[ch.Name],
 		HeroAbilities: heroAbilities[ch.Name],
 	}
+
+	u := getCurrentUser(r)
+	if u != nil {
+		detail.LoggedIn = true
+		userLock.RLock()
+		owned := userSoulbreaks[u.ID]
+		if owned == nil {
+			owned = make(map[string]bool)
+		}
+		detail.OwnedSoulbreaks = owned
+		userLock.RUnlock()
+	} else {
+		detail.OwnedSoulbreaks = make(map[string]bool)
+	}
+
 	charTmpl.Execute(w, detail)
 }
 
@@ -2316,6 +2953,9 @@ func charHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	log.Println("Loading data...")
 	reloadData()
+
+	log.Println("Loading user data...")
+	initUserData()
 
 	go func() {
 		ticker := time.NewTicker(6 * time.Hour)
@@ -2330,6 +2970,11 @@ func main() {
 	http.HandleFunc("/char/", charHandler)
 	http.HandleFunc("/search", searchHandler)
 	http.HandleFunc("/api/characters", characterAPIHandler)
+	http.HandleFunc("/api/login", loginHandler)
+	http.HandleFunc("/api/register", registerHandler)
+	http.HandleFunc("/api/logout", logoutHandler)
+	http.HandleFunc("/api/me", meHandler)
+	http.HandleFunc("/api/user/soulbreaks", userSoulbreaksHandler)
 
 	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)
