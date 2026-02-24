@@ -219,9 +219,9 @@ func haMatchesAdditionalEffects(ha HeroAbility, effects []string) bool {
 	return true
 }
 
-// textContainsAttach checks if text contains "Attach <element>" pattern
+// textContainsAttach checks if text contains "Attach <element>" or "En-<element>" pattern
 func textContainsAttach(text, element string) bool {
-	return containsCI(text, "Attach "+element)
+	return containsCI(text, "Attach "+element) || containsCI(text, "En-"+element)
 }
 
 // textContainsImperil checks if text contains "Imperil <element>" or "Imperil Prismatic"
