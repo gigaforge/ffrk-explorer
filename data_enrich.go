@@ -419,13 +419,16 @@ type imageJob struct {
 }
 
 func (d *AppData) cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave", "images/trigger"}
 	for _, dir := range dirs {
 		os.MkdirAll(dir, 0o755)
 	}
 
 	// Cache static brave images
 	ensureCachedFile("images/brave/BraveBase.png", "https://dff.sp.mbga.jp/dff/static/lang/image/ability/30151001/30151001_128.png")
+
+	// Cache static trigger ability image
+	ensureCachedFile("images/trigger/default_attack.png", "https://dff.sp.mbga.jp/dff/static/lang/image/ability/30151001/30151001_128.png")
 	for i := 0; i <= 3; i++ {
 		ensureCachedFile(fmt.Sprintf("images/brave/BraveAttack%d.png", i),
 			fmt.Sprintf("https://dff.sp.mbga.jp/dff/static/lang/image/brave/level/level_%d.png", i))
@@ -476,6 +479,17 @@ func (d *AppData) cacheAllImages() {
 				if sbList[i].ZenithAbilities[j].ID != "" {
 					jobs = append(jobs, imageJob{"images/zenith", "images/zenith", burstFmt, sbList[i].ZenithAbilities[j].ID, &sbList[i].ZenithAbilities[j].Img})
 				}
+			}
+		}
+		d.SoulBreaks[name] = sbList
+	}
+
+	// Set default image for trigger abilities on all soul breaks
+	for name := range d.SoulBreaks {
+		sbList := d.SoulBreaks[name]
+		for i := range sbList {
+			for j := range sbList[i].TriggerAbilities {
+				sbList[i].TriggerAbilities[j].Img = "/images/trigger/default_attack.png"
 			}
 		}
 		d.SoulBreaks[name] = sbList

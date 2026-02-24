@@ -38,6 +38,7 @@ var csvSheets = []csvSheet{
 	{"Synchro.csv", "13552509", []string{"Character", "Source", "Name"}},
 	{"Zenith-SB-Abilities.csv", "1801274757", []string{"Character", "Source", "Name"}},
 	{"Brave.csv", "1286318057", []string{"Character", "Source", "Name"}},
+	{"Trigger-Abilities.csv", "2001933731", []string{"Source Type", "Source", "Name"}},
 	{"Status.csv", "1899148923", []string{"Common Name", "Effects"}},
 }
 

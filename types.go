@@ -75,6 +75,22 @@ type BraveCommand struct {
 	Levels    []BraveLevel // 0-3
 }
 
+type TriggerAbility struct {
+	SourceType     string
+	Img            string
+	Name           string
+	Type           string
+	Target         string
+	Formula        string
+	Multiplier     string
+	Element        string
+	Time           string
+	Effects        string
+	School         string
+	ID             string
+	MatchedEffects []StatusEffect
+}
+
 type SoulBreak struct {
 	Character        string
 	Img              string
@@ -90,6 +106,7 @@ type SoulBreak struct {
 	BurstCommands    []BurstCommand
 	SynchroAbilities []SynchroAbility
 	ZenithAbilities  []ZenithAbility
+	TriggerAbilities []TriggerAbility
 	DualShift        *SoulBreak
 	ArcaneDyad       *SoulBreak
 	BraveCommand     *BraveCommand
@@ -137,6 +154,7 @@ type AppData struct {
 	SynchroAbilities map[string][]SynchroAbility
 	ZenithAbilities  map[string][]ZenithAbility
 	BraveCommands    map[string]*BraveCommand
+	TriggerAbilities map[string][]TriggerAbility // sbName → []TriggerAbility
 	StatusEffects    map[string]StatusEffect
 	statusMatchTerms []string
 	RealmGroups      []RealmGroup

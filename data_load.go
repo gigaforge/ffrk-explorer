@@ -57,6 +57,9 @@ func buildAppDataFromCSVDir(dir string) (*AppData, error) {
 	if err := d.loadBraveCommands(); err != nil {
 		return nil, fmt.Errorf("load brave commands: %w", err)
 	}
+	if err := d.loadTriggerAbilities(); err != nil {
+		return nil, fmt.Errorf("load trigger abilities: %w", err)
+	}
 	if err := d.loadStatuses(); err != nil {
 		return nil, fmt.Errorf("load statuses: %w", err)
 	}
@@ -67,6 +70,7 @@ func buildAppDataFromCSVDir(dir string) (*AppData, error) {
 	d.matchSynchroAbilities()
 	d.matchZenithAbilities()
 	d.matchBraveCommands()
+	d.matchTriggerAbilities()
 	d.cacheAllImages()
 	d.buildRealmGroups()
 	return d, nil
@@ -515,6 +519,56 @@ func (d *AppData) matchBraveCommands() {
 			key := sbGroupKey(sbList[i].Character, sbList[i].Name)
 			if bc, ok := d.BraveCommands[key]; ok {
 				sbList[i].BraveCommand = d.cloneMatchedBraveCommand(bc)
+			}
+		}
+		d.SoulBreaks[name] = sbList
+	}
+}
+
+func (d *AppData) loadTriggerAbilities() error {
+	d.TriggerAbilities = make(map[string][]TriggerAbility)
+	rows, err := d.readCSV("Trigger-Abilities.csv")
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		ta := TriggerAbility{
+			SourceType: row["Source Type"],
+			Name:       row["Name"],
+			Type:       row["Type"],
+			Target:     row["Target"],
+			Formula:    row["Formula"],
+			Multiplier: row["Multiplier"],
+			Element:    row["Element"],
+			Time:       row["Time"],
+			Effects:    row["Effects"],
+			School:     row["School"],
+			ID:         row["ID"],
+		}
+		source := row["Source"]
+		d.TriggerAbilities[source] = append(d.TriggerAbilities[source], ta)
+	}
+	for key, abs := range d.TriggerAbilities {
+		sort.Slice(abs, func(i, j int) bool {
+			return abs[i].ID < abs[j].ID
+		})
+		d.TriggerAbilities[key] = abs
+	}
+	log.Printf("Loaded %d trigger ability groups", len(d.TriggerAbilities))
+	return nil
+}
+
+func (d *AppData) matchTriggerAbilities() {
+	for name, sbList := range d.SoulBreaks {
+		for i := range sbList {
+			if children, ok := d.TriggerAbilities[sbList[i].Name]; ok {
+				sbList[i].TriggerAbilities = cloneWithMatchedEffects(
+					d,
+					children,
+					func(ta TriggerAbility) string { return ta.Effects },
+					func(ta *TriggerAbility, effects string) { ta.Effects = effects },
+					func(ta *TriggerAbility, matched []StatusEffect) { ta.MatchedEffects = matched },
+				)
 			}
 		}
 		d.SoulBreaks[name] = sbList

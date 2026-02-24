@@ -190,9 +190,9 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 <table>
 <tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
-<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
+<tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
   {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()"><input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}></td>{{end}}
-  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
+  <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
   <td>{{.Name}}</td>
   <td>{{.Tier}}</td>
@@ -201,7 +201,7 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
   <td>{{.Time}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
-{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .DualShift .ArcaneDyad .BraveCommand}}
+{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
 <tr class="sb-detail">
   <td colspan="{{if $.LoggedIn}}9{{else}}8{{end}}">
     {{if .BraveCommand}}
@@ -393,6 +393,45 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
         {{if .MatchedEffects}}
         <tr class="bc-detail">
           <td colspan="9">
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </table>
+    </div>
+    {{end}}
+    {{if .TriggerAbilities}}
+    <div class="burst-commands">
+      <div class="burst-title">Trigger Abilities</div>
+      <table class="burst-table">
+        <tr><th></th><th></th><th>Source Type</th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Formula</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        {{range .TriggerAbilities}}
+        <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+          <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+          <td>{{.SourceType}}</td>
+          <td>{{.Name}}</td>
+          <td>{{.School}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Target}}</td>
+          <td>{{.Formula}}</td>
+          <td>{{.Multiplier}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+        </tr>
+        {{if .MatchedEffects}}
+        <tr class="bc-detail">
+          <td colspan="12">
             <ul class="effect-list">
             {{range .MatchedEffects}}
               <li>
