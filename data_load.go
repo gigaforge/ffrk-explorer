@@ -532,6 +532,9 @@ func (d *AppData) loadTriggerAbilities() error {
 		return err
 	}
 	for _, row := range rows {
+		if row["Source Type"] == "Attach Status" {
+			continue
+		}
 		ta := TriggerAbility{
 			SourceType: row["Source Type"],
 			Name:       row["Name"],
@@ -561,10 +564,16 @@ func (d *AppData) loadTriggerAbilities() error {
 func (d *AppData) matchTriggerAbilities() {
 	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
-			if children, ok := d.TriggerAbilities[sbList[i].Name]; ok {
+			var all []TriggerAbility
+			for _, se := range sbList[i].MatchedEffects {
+				if children, ok := d.TriggerAbilities[se.Name]; ok {
+					all = append(all, children...)
+				}
+			}
+			if len(all) > 0 {
 				sbList[i].TriggerAbilities = cloneWithMatchedEffects(
 					d,
-					children,
+					all,
 					func(ta TriggerAbility) string { return ta.Effects },
 					func(ta *TriggerAbility, effects string) { ta.Effects = effects },
 					func(ta *TriggerAbility, matched []StatusEffect) { ta.MatchedEffects = matched },
