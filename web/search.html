@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Search - FFRK Soul Break Tracker &amp; Search</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,6 +65,96 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 td.sb-owned { width: 24px; padding: 4px; text-align: center; }
 td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; width: 16px; height: 16px; }
+
+@media (max-width: 768px) {
+  body { padding-left: 12px; padding-right: 12px; }
+
+  /* Hide table headers on mobile */
+  table:not(.burst-table) > thead > tr,
+  table:not(.burst-table) > tbody > tr > th,
+  table:not(.burst-table) > tr:first-child { display: none; }
+
+  table:not(.burst-table) { border-collapse: separate; border-spacing: 0 8px; }
+
+  /* Soul break rows become cards */
+  tr.sb-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 8px; gap: 4px 8px;
+    background: #16213e; border-radius: 6px;
+    border-bottom: none !important;
+  }
+  tr.sb-row > td { border-bottom: none; padding: 2px; background: transparent; }
+
+  /* Chevron */
+  tr.sb-row td.sb-chevron { order: 0; width: auto; padding: 2px 4px; }
+  /* Owned checkbox */
+  tr.sb-row td.sb-owned { order: 1; width: auto; }
+  /* Icon - shrink */
+  tr.sb-row td:has(.sb-icon) { order: 2; }
+  .sb-icon, .sb-icon img { width: 48px; height: 48px; }
+  .sb-icon img { width: 72px; height: 72px; margin: -12px; }
+  td img { width: 48px; height: 48px; }
+
+  /* Name */
+  tr.sb-row td:nth-child(4), /* without owned */
+  tr.sb-row td:nth-child(5)  /* with owned */
+  { order: 3; font-weight: bold; color: #e94560; font-size: 15px; }
+
+  /* Tier, Type, Element, Time - inline tags */
+  tr.sb-row td:nth-child(5):not(:has(.effects)):not(.sb-owned),
+  tr.sb-row td:nth-child(6):not(:has(.effects)),
+  tr.sb-row td:nth-child(7):not(:has(.effects)),
+  tr.sb-row td:nth-child(8):not(:has(.effects))
+  { order: 4; font-size: 12px; color: #aaa; background: #1a1a2e; border-radius: 3px; padding: 2px 6px !important; }
+
+  /* Effects - full width */
+  tr.sb-row td:has(.effects), tr.sb-row td .effects,
+  td.effects { max-width: none; }
+  tr.sb-row td:last-child { order: 5; flex-basis: 100%; font-size: 14px; line-height: 1.4; }
+
+  /* Detail/expand rows */
+  tr.sb-detail.visible { display: block; }
+  tr.sb-detail td { display: block; padding: 8px !important; }
+  tr.sb-detail td[colspan] { width: 100%; }
+
+  /* Burst/nested tables */
+  .burst-table { font-size: 13px; }
+  .burst-table thead tr { display: none; }
+  .burst-table { border-collapse: separate; border-spacing: 0 6px; }
+  tr.bc-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 6px; gap: 3px 6px;
+    background: #0f1a2e; border-radius: 4px;
+  }
+  tr.bc-row > td { border-bottom: none; padding: 2px; background: transparent; }
+  tr.bc-row td.bc-chevron { order: 0; width: auto; }
+  tr.bc-row td:last-child { order: 5; flex-basis: 100%; font-size: 13px; }
+  .burst-table td.effects, .burst-table td:has(.effects),
+  tr.bc-row td .effects { max-width: none; }
+
+  tr.bc-detail.visible { display: block; }
+  tr.bc-detail td { display: block; padding: 6px !important; }
+  tr.bc-detail td[colspan] { width: 100%; }
+
+  /* Hero ability table rows */
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 8px; gap: 4px 8px;
+    background: #16213e; border-radius: 6px;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) > td {
+    border-bottom: none; background: transparent; padding: 2px;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td:last-child {
+    flex-basis: 100%; font-size: 14px; line-height: 1.4;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td .effects,
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td.effects {
+    max-width: none;
+  }
+
+  .char-header img { width: 36px; height: 36px; }
+}
 </style>
 </head><body>
 {{template "search_bar" .}}

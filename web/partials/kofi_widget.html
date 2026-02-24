@@ -1,5 +1,13 @@
 {{define "kofi_widget"}}
 
+<style>
+@media (max-width: 768px) {
+  .floatingchat-container-wrap-mobi {
+    transform: scale(0.7);
+    transform-origin: bottom right;
+  }
+}
+</style>
 <script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
 <script>
   kofiWidgetOverlay.draw('gigaforge', {

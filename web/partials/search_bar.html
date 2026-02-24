@@ -1,6 +1,7 @@
 {{define "search_bar"}}
 
 <div class="search-bar">
+  <button class="search-bar-toggle" id="search-bar-toggle" onclick="toggleSearchBar()">&#128269; Open Search</button>
   <label>Character</label>
   <input type="text" id="char-input" list="char-list" placeholder="Name...">
   <datalist id="char-list"></datalist>
@@ -33,7 +34,7 @@
   </select>
   <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
   <button onclick="openSchoolsModal()">Job Requirements<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
-  <button onclick="doSearch()">Search</button>
+  <button class="search-btn" onclick="doSearch()">Search</button>
   <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only"> Owned only</label>
   <div class="auth-area" id="auth-area"></div>
 </div>
@@ -150,6 +151,22 @@ function updateSearchBarHeight(){
   var bar=document.querySelector('.search-bar');
   if(!bar) return;
   document.documentElement.style.setProperty('--search-bar-height', bar.offsetHeight+'px');
+}
+function toggleSearchBar(){
+  var bar=document.querySelector('.search-bar');
+  if(!bar) return;
+  bar.classList.toggle('collapsed');
+  var btn=document.getElementById('search-bar-toggle');
+  if(bar.classList.contains('collapsed')){
+    btn.innerHTML='&#128269; Open Search';
+  } else {
+    btn.textContent='Cancel';
+  }
+  updateSearchBarHeight();
+}
+if(window.innerWidth<=768){
+  var bar=document.querySelector('.search-bar');
+  if(bar) bar.classList.add('collapsed');
 }
 updateSearchBarHeight();
 window.addEventListener('resize', updateSearchBarHeight);
