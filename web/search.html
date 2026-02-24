@@ -415,12 +415,11 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
     <div class="burst-commands">
       <div class="burst-title">Trigger Abilities</div>
       <table class="burst-table">
-        <tr><th></th><th></th><th>Source Type</th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Formula</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+        <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Formula</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
         {{range .TriggerAbilities}}
         <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
           <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
           <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
-          <td>{{.SourceType}}</td>
           <td>{{.Name}}</td>
           <td>{{.School}}</td>
           <td>{{.Type}}</td>
@@ -433,7 +432,7 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
         </tr>
         {{if .MatchedEffects}}
         <tr class="bc-detail">
-          <td colspan="12">
+          <td colspan="11">
             <ul class="effect-list">
             {{range .MatchedEffects}}
               <li>

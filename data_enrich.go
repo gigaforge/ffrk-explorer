@@ -352,6 +352,9 @@ func (d *AppData) buildRealmGroups() {
 // downloads from remoteFmt (which should contain one or more %s placeholders for the ID).
 // Returns the URL path to serve the image, or "" on failure.
 func ensureCachedImage(dir, urlPath, remoteFmt, id string) string {
+	if id == "" || id[0] == '-' {
+		return ""
+	}
 	localPath := filepath.Join(dir, id+".png")
 	servePath := "/" + urlPath + "/" + id + ".png"
 	if _, err := os.Stat(localPath); err == nil {
