@@ -17,6 +17,12 @@ var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
 var pctRe = regexp.MustCompile(`([+-])\d+%`)
 var forSecRe = regexp.MustCompile(`for (\d+(?:\.\d+)?) seconds`)
 
+type statusTextMatch struct {
+	start int
+	end   int
+	se    StatusEffect
+}
+
 func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
 	// Try exact match first
 	if se, ok := d.StatusEffects[term]; ok {
@@ -41,31 +47,123 @@ func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
 	return StatusEffect{}, false
 }
 
+func fillStatusDurationFromFollowing(text string, end int, durLocs [][]int, se StatusEffect) StatusEffect {
+	if se.Duration != "" && se.Duration != "-" {
+		return se
+	}
+	for _, dloc := range durLocs {
+		if dloc[0] >= end {
+			se.Duration = text[dloc[2]:dloc[3]] + " seconds"
+			break
+		}
+	}
+	return se
+}
+
+func markOccupied(occupied []bool, start, end int) {
+	if start < 0 {
+		start = 0
+	}
+	if end > len(occupied) {
+		end = len(occupied)
+	}
+	for i := start; i < end; i++ {
+		occupied[i] = true
+	}
+}
+
+func spanOccupied(occupied []bool, start, end int) bool {
+	if start < 0 || end > len(occupied) || start >= end {
+		return true
+	}
+	for i := start; i < end; i++ {
+		if occupied[i] {
+			return true
+		}
+	}
+	return false
+}
+
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+func boundaryOK(text string, start, end int) bool {
+	if start < 0 || end > len(text) || start >= end {
+		return false
+	}
+	if start > 0 && isWordByte(text[start-1]) && isWordByte(text[start]) {
+		return false
+	}
+	if end < len(text) && isWordByte(text[end-1]) && isWordByte(text[end]) {
+		return false
+	}
+	return true
+}
+
 // matchEffectsInText extracts bracketed status effects from text, inferring
 // duration from the next "for N seconds" that follows each bracket when the
 // status has no default duration.
 func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 	bracketLocs := bracketRe.FindAllStringSubmatchIndex(text, -1)
 	durLocs := forSecRe.FindAllStringSubmatchIndex(text, -1)
+	occupied := make([]bool, len(text))
 
 	var results []StatusEffect
 	for _, bloc := range bracketLocs {
+		markOccupied(occupied, bloc[0], bloc[1]) // skip full-text matching inside already-bracketed text
 		term := text[bloc[2]:bloc[3]]
 		se, ok := d.lookupStatus(term)
 		if !ok {
 			continue
 		}
-		if se.Duration == "" || se.Duration == "-" {
-			// Find the first "for N seconds" whose start is after this bracket's end
-			bracketEnd := bloc[1]
-			for _, dloc := range durLocs {
-				if dloc[0] >= bracketEnd {
-					se.Duration = text[dloc[2]:dloc[3]] + " seconds"
-					break
+		se = fillStatusDurationFromFollowing(text, bloc[1], durLocs, se)
+		results = append(results, se)
+	}
+
+	if len(d.statusMatchTerms) == 0 || len(text) == 0 {
+		return results
+	}
+
+	var textMatches []statusTextMatch
+	for _, term := range d.statusMatchTerms {
+		if term == "" {
+			continue
+		}
+		for off := 0; off < len(text); {
+			idx := strings.Index(text[off:], term)
+			if idx < 0 {
+				break
+			}
+			start := off + idx
+			end := start + len(term)
+			if boundaryOK(text, start, end) && !spanOccupied(occupied, start, end) {
+				se, ok := d.lookupStatus(term)
+				if ok {
+					se = fillStatusDurationFromFollowing(text, end, durLocs, se)
+					textMatches = append(textMatches, statusTextMatch{
+						start: start,
+						end:   end,
+						se:    se,
+					})
+					markOccupied(occupied, start, end)
 				}
 			}
+			off = start + 1
 		}
-		results = append(results, se)
+	}
+
+	sort.Slice(textMatches, func(i, j int) bool {
+		if textMatches[i].start != textMatches[j].start {
+			return textMatches[i].start < textMatches[j].start
+		}
+		if textMatches[i].end != textMatches[j].end {
+			return textMatches[i].end < textMatches[j].end
+		}
+		return textMatches[i].se.Name < textMatches[j].se.Name
+	})
+	for _, m := range textMatches {
+		results = append(results, m.se)
 	}
 	return results
 }

@@ -138,6 +138,7 @@ type AppData struct {
 	ZenithAbilities  map[string][]ZenithAbility
 	BraveCommands    map[string]*BraveCommand
 	StatusEffects    map[string]StatusEffect
+	statusMatchTerms []string
 	RealmGroups      []RealmGroup
 	CharByID         map[string]*Character
 	TierNames        []string

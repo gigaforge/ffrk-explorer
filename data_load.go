@@ -526,6 +526,16 @@ func (d *AppData) loadStatuses() error {
 			Duration:    strings.TrimSpace(row["Default Duration"]),
 		}
 	}
+	d.statusMatchTerms = make([]string, 0, len(d.StatusEffects))
+	for name := range d.StatusEffects {
+		d.statusMatchTerms = append(d.statusMatchTerms, name)
+	}
+	sort.Slice(d.statusMatchTerms, func(i, j int) bool {
+		if len(d.statusMatchTerms[i]) != len(d.statusMatchTerms[j]) {
+			return len(d.statusMatchTerms[i]) > len(d.statusMatchTerms[j])
+		}
+		return d.statusMatchTerms[i] < d.statusMatchTerms[j]
+	})
 	log.Printf("Loaded %d status effects", len(d.StatusEffects))
 	return nil
 }
