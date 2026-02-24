@@ -205,7 +205,7 @@ func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, ma
 		return matchedHAs, totalCount, truncated
 	}
 
-	if len(matchedSBs) == 0 || !req.HasEffectFilter {
+	if !req.HasEffectFilter {
 		return nil, totalCount, false
 	}
 
