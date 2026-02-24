@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -21,7 +22,7 @@ var funcMap = template.FuncMap{
 var webTemplatesFS embed.FS
 
 func mustParseTemplate(name, path string) *template.Template {
-	return template.Must(template.New(name).Funcs(funcMap).ParseFS(webTemplatesFS, path, "web/partials/*.html"))
+	return template.Must(template.New(filepath.Base(path)).Funcs(funcMap).ParseFS(webTemplatesFS, path, "web/partials/*.html"))
 }
 
 var indexTmpl = mustParseTemplate("index", "web/index.html")
