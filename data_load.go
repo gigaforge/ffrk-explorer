@@ -11,32 +11,36 @@ import (
 )
 
 func reloadData() {
+	next := buildAppData()
+
 	dataLock.Lock()
-	defer dataLock.Unlock()
+	appData = next
+	dataLock.Unlock()
 
-	characters = nil
-	realmGroups = nil
+	log.Printf("Reloaded %d characters", len(next.Characters))
+}
 
-	loadCharacters()
-	applyRecordSphereUpgrades()
-	loadSoulBreaks()
-	loadHeroAbilities()
-	loadBurstCommands()
-	loadSynchroAbilities()
-	loadZenithAbilities()
-	loadBraveCommands()
-	loadStatuses()
-	matchSoulBreakEffects()
-	pairDualShifts()
-	pairArcaneDyads()
-	matchBurstCommands()
-	matchSynchroAbilities()
-	matchZenithAbilities()
-	matchBraveCommands()
-	cacheAllImages()
-	buildRealmGroups()
-
-	log.Printf("Reloaded %d characters", len(characters))
+func buildAppData() *AppData {
+	d := &AppData{}
+	d.loadCharacters()
+	d.applyRecordSphereUpgrades()
+	d.loadSoulBreaks()
+	d.loadHeroAbilities()
+	d.loadBurstCommands()
+	d.loadSynchroAbilities()
+	d.loadZenithAbilities()
+	d.loadBraveCommands()
+	d.loadStatuses()
+	d.matchSoulBreakEffects()
+	d.pairDualShifts()
+	d.pairArcaneDyads()
+	d.matchBurstCommands()
+	d.matchSynchroAbilities()
+	d.matchZenithAbilities()
+	d.matchBraveCommands()
+	d.cacheAllImages()
+	d.buildRealmGroups()
+	return d
 }
 
 // ---------- CSV loading ----------
@@ -78,7 +82,7 @@ var schoolNames = []string{
 	"Machinist", "Darkness", "Sharpshooter", "Witch", "Heavy",
 }
 
-func loadCharacters() {
+func (d *AppData) loadCharacters() {
 	rows := mustReadCSV("Characters.csv")
 	for _, row := range rows {
 		c := Character{
@@ -100,22 +104,22 @@ func loadCharacters() {
 				}
 			}
 		}
-		characters = append(characters, c)
+		d.Characters = append(d.Characters, c)
 	}
 }
 
 var recordSphereUpgradeRE = regexp.MustCompile(`^(.+?)\s+(\d)★\s*->\s*(\d)★$`)
 
-func applyRecordSphereUpgrades() {
+func (d *AppData) applyRecordSphereUpgrades() {
 	if _, err := os.Stat(csvPath("Record-Spheres.csv")); err != nil {
 		return
 	}
 	rows := mustReadCSV("Record-Spheres.csv")
 
-	// Build name -> index lookup for characters
-	charIndex := make(map[string]int, len(characters))
-	for i := range characters {
-		charIndex[characters[i].Name] = i
+	// Build name -> index lookup for d.Characters
+	charIndex := make(map[string]int, len(d.Characters))
+	for i := range d.Characters {
+		charIndex[d.Characters[i].Name] = i
 	}
 
 	lvCols := []string{"S. Lv 1", "S. Lv 2", "S. Lv 3", "S. Lv 4", "S. Lv 5"}
@@ -127,7 +131,7 @@ func applyRecordSphereUpgrades() {
 		if !ok {
 			continue
 		}
-		c := &characters[ci]
+		c := &d.Characters[ci]
 		for _, col := range lvCols {
 			val := strings.TrimSpace(row[col])
 			m := recordSphereUpgradeRE.FindStringSubmatch(val)
@@ -170,8 +174,8 @@ func isValidTier(s string) bool {
 	return hasUpper
 }
 
-func loadSoulBreaks() {
-	soulBreaks = make(map[string][]SoulBreak)
+func (d *AppData) loadSoulBreaks() {
+	d.SoulBreaks = make(map[string][]SoulBreak)
 	tierSet := make(map[string]bool)
 	rows := mustReadCSV("Soul-Breaks.csv")
 	for _, row := range rows {
@@ -187,20 +191,20 @@ func loadSoulBreaks() {
 			Effects:   row["Effects"],
 			ID:        row["ID"],
 		}
-		soulBreaks[sb.Character] = append(soulBreaks[sb.Character], sb)
+		d.SoulBreaks[sb.Character] = append(d.SoulBreaks[sb.Character], sb)
 		if isValidTier(sb.Tier) {
 			tierSet[sb.Tier] = true
 		}
 	}
-	tierNames = nil
+	d.TierNames = nil
 	for t := range tierSet {
-		tierNames = append(tierNames, t)
+		d.TierNames = append(d.TierNames, t)
 	}
-	sort.Strings(tierNames)
+	sort.Strings(d.TierNames)
 }
 
-func loadHeroAbilities() {
-	heroAbilities = make(map[string][]HeroAbility)
+func (d *AppData) loadHeroAbilities() {
+	d.HeroAbilities = make(map[string][]HeroAbility)
 	rows := mustReadCSV("Hero-Abilities.csv")
 	for _, row := range rows {
 		ha := HeroAbility{
@@ -215,12 +219,12 @@ func loadHeroAbilities() {
 			School:    row["School"],
 			ID:        row["ID"],
 		}
-		heroAbilities[ha.Character] = append(heroAbilities[ha.Character], ha)
+		d.HeroAbilities[ha.Character] = append(d.HeroAbilities[ha.Character], ha)
 	}
 }
 
-func loadBurstCommands() {
-	burstCommands = make(map[string][]BurstCommand)
+func (d *AppData) loadBurstCommands() {
+	d.BurstCommands = make(map[string][]BurstCommand)
 	rows := mustReadCSV("Burst.csv")
 	for _, row := range rows {
 		bc := BurstCommand{
@@ -234,41 +238,41 @@ func loadBurstCommands() {
 			ID:      row["ID"],
 		}
 		key := row["Character"] + "|" + row["Source"]
-		burstCommands[key] = append(burstCommands[key], bc)
+		d.BurstCommands[key] = append(d.BurstCommands[key], bc)
 	}
 	// Sort each group so ID ending in '1' comes before '2'
-	for key, cmds := range burstCommands {
+	for key, cmds := range d.BurstCommands {
 		sort.Slice(cmds, func(i, j int) bool {
 			return cmds[i].ID < cmds[j].ID
 		})
-		burstCommands[key] = cmds
+		d.BurstCommands[key] = cmds
 	}
-	log.Printf("Loaded %d burst command groups", len(burstCommands))
+	log.Printf("Loaded %d burst command groups", len(d.BurstCommands))
 }
 
-func matchBurstCommands() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) matchBurstCommands() {
+	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
 			if sbList[i].Tier != "BSB" {
 				continue
 			}
 			key := sbList[i].Character + "|" + sbList[i].Name
-			if cmds, ok := burstCommands[key]; ok {
+			if cmds, ok := d.BurstCommands[key]; ok {
 				// Deep copy and match status effects for each command
 				matched := make([]BurstCommand, len(cmds))
 				copy(matched, cmds)
 				for j := range matched {
-					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
+					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
 				}
 				sbList[i].BurstCommands = matched
 			}
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 }
 
-func loadSynchroAbilities() {
-	synchroAbilities = make(map[string][]SynchroAbility)
+func (d *AppData) loadSynchroAbilities() {
+	d.SynchroAbilities = make(map[string][]SynchroAbility)
 	rows := mustReadCSV("Synchro.csv")
 	for _, row := range rows {
 		sa := SynchroAbility{
@@ -285,39 +289,39 @@ func loadSynchroAbilities() {
 			ConditionID: row["Synchro Condition ID"],
 		}
 		key := row["Character"] + "|" + row["Source"]
-		synchroAbilities[key] = append(synchroAbilities[key], sa)
+		d.SynchroAbilities[key] = append(d.SynchroAbilities[key], sa)
 	}
-	for key, abs := range synchroAbilities {
+	for key, abs := range d.SynchroAbilities {
 		sort.Slice(abs, func(i, j int) bool {
 			return abs[i].Slot < abs[j].Slot
 		})
-		synchroAbilities[key] = abs
+		d.SynchroAbilities[key] = abs
 	}
-	log.Printf("Loaded %d synchro ability groups", len(synchroAbilities))
+	log.Printf("Loaded %d synchro ability groups", len(d.SynchroAbilities))
 }
 
-func matchSynchroAbilities() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) matchSynchroAbilities() {
+	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
 			if sbList[i].Tier != "SASB" {
 				continue
 			}
 			key := sbList[i].Character + "|" + sbList[i].Name
-			if abs, ok := synchroAbilities[key]; ok {
+			if abs, ok := d.SynchroAbilities[key]; ok {
 				matched := make([]SynchroAbility, len(abs))
 				copy(matched, abs)
 				for j := range matched {
-					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
+					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
 				}
 				sbList[i].SynchroAbilities = matched
 			}
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 }
 
-func loadZenithAbilities() {
-	zenithAbilities = make(map[string][]ZenithAbility)
+func (d *AppData) loadZenithAbilities() {
+	d.ZenithAbilities = make(map[string][]ZenithAbility)
 	rows := mustReadCSV("Zenith-SB-Abilities.csv")
 	for _, row := range rows {
 		za := ZenithAbility{
@@ -331,44 +335,44 @@ func loadZenithAbilities() {
 			ID:      row["ID"],
 		}
 		key := row["Character"] + "|" + row["Source"]
-		zenithAbilities[key] = append(zenithAbilities[key], za)
+		d.ZenithAbilities[key] = append(d.ZenithAbilities[key], za)
 	}
-	log.Printf("Loaded %d zenith ability groups", len(zenithAbilities))
+	log.Printf("Loaded %d zenith ability groups", len(d.ZenithAbilities))
 }
 
-func matchZenithAbilities() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) matchZenithAbilities() {
+	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
 			if sbList[i].Tier != "ZSB" {
 				continue
 			}
 			key := sbList[i].Character + "|" + sbList[i].Name
-			if abs, ok := zenithAbilities[key]; ok {
+			if abs, ok := d.ZenithAbilities[key]; ok {
 				matched := make([]ZenithAbility, len(abs))
 				copy(matched, abs)
 				for j := range matched {
-					matched[j].MatchedEffects = matchEffectsInText(matched[j].Effects)
+					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
 				}
 				sbList[i].ZenithAbilities = matched
 			}
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 }
 
-func loadBraveCommands() {
-	braveCommands = make(map[string]*BraveCommand)
+func (d *AppData) loadBraveCommands() {
+	d.BraveCommands = make(map[string]*BraveCommand)
 	rows := mustReadCSV("Brave.csv")
 	for _, row := range rows {
 		key := row["Character"] + "|" + row["Source"]
-		bc, ok := braveCommands[key]
+		bc, ok := d.BraveCommands[key]
 		if !ok {
 			bc = &BraveCommand{
 				Name:      row["Name"],
 				School:    row["School"],
 				Condition: row["Brave Condition"],
 			}
-			braveCommands[key] = bc
+			d.BraveCommands[key] = bc
 		}
 		bl := BraveLevel{
 			Level:   row["Brave"],
@@ -381,48 +385,48 @@ func loadBraveCommands() {
 		bc.Levels = append(bc.Levels, bl)
 	}
 	// Sort levels by Brave value (0-3)
-	for _, bc := range braveCommands {
+	for _, bc := range d.BraveCommands {
 		sort.Slice(bc.Levels, func(i, j int) bool {
 			return bc.Levels[i].Level < bc.Levels[j].Level
 		})
 	}
-	log.Printf("Loaded %d brave commands", len(braveCommands))
+	log.Printf("Loaded %d brave commands", len(d.BraveCommands))
 }
 
-func matchBraveCommands() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) matchBraveCommands() {
+	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
 			if !strings.Contains(sbList[i].Effects, "[Brave Mode]") {
 				continue
 			}
 			key := sbList[i].Character + "|" + sbList[i].Name
-			if bc, ok := braveCommands[key]; ok {
+			if bc, ok := d.BraveCommands[key]; ok {
 				matched := *bc
 				matched.Levels = make([]BraveLevel, len(bc.Levels))
 				copy(matched.Levels, bc.Levels)
 				for j := range matched.Levels {
-					matched.Levels[j].MatchedEffects = matchEffectsInText(matched.Levels[j].Effects)
+					matched.Levels[j].MatchedEffects = d.matchEffectsInText(matched.Levels[j].Effects)
 				}
 				sbList[i].BraveCommand = &matched
 			}
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 }
 
-func loadStatuses() {
-	statusEffects = make(map[string]StatusEffect)
+func (d *AppData) loadStatuses() {
+	d.StatusEffects = make(map[string]StatusEffect)
 	rows := mustReadCSV("Status.csv")
 	for _, row := range rows {
 		name := strings.TrimSpace(row["Common Name"])
 		if name == "" {
 			continue
 		}
-		statusEffects[name] = StatusEffect{
+		d.StatusEffects[name] = StatusEffect{
 			Name:        name,
 			Description: strings.TrimSpace(row["Effects"]),
 			Duration:    strings.TrimSpace(row["Default Duration"]),
 		}
 	}
-	log.Printf("Loaded %d status effects", len(statusEffects))
+	log.Printf("Loaded %d status effects", len(d.StatusEffects))
 }

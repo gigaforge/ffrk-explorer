@@ -8,8 +8,11 @@ import (
 )
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-	dataLock.RLock()
-	defer dataLock.RUnlock()
+	d := getAppDataSnapshot()
+	if d == nil {
+		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+		return
+	}
 	charFilter := r.URL.Query().Get("character")
 	realmFilter := r.URL.Query().Get("realm")
 	tierFilter := r.URL.Query().Get("tier")
@@ -57,9 +60,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	u := getCurrentUser(r)
 	var ownedSet map[string]bool
 	if u != nil {
-		userLock.RLock()
-		ownedSet = userSoulbreaks[u.ID]
-		userLock.RUnlock()
+		ownedSet = snapshotOwnedSoulbreaks(u.ID)
 	}
 	if ownedOnly && (u == nil || ownedSet == nil) {
 		ownedOnly = false
@@ -67,7 +68,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Filter characters
 	var matchedChars []Character
-	for _, c := range characters {
+	for _, c := range d.Characters {
 		if charFilter != "" && !strings.Contains(strings.ToLower(c.Name), strings.ToLower(charFilter)) {
 			continue
 		}
@@ -113,7 +114,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Collect matching soul breaks
 		var matchedSBs []SoulBreak
-		for _, sb := range soulBreaks[c.Name] {
+		for _, sb := range d.SoulBreaks[c.Name] {
 			if ownedOnly && !ownedSet[sb.ID] {
 				continue
 			}
@@ -143,7 +144,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		//   and only if the character also has matching soul breaks
 		var matchedHAs []HeroAbility
 		if !truncated && !hasSBFilter {
-			for _, ha := range heroAbilities[c.Name] {
+			for _, ha := range d.HeroAbilities[c.Name] {
 				matchedHAs = append(matchedHAs, ha)
 				totalCount++
 				if totalCount >= maxResults {
@@ -152,7 +153,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if !truncated && len(matchedSBs) > 0 && hasEffectFilter {
-			for _, ha := range heroAbilities[c.Name] {
+			for _, ha := range d.HeroAbilities[c.Name] {
 				match := false
 				if elementFilter != "" && textContainsAttach(ha.Effects, elementFilter) {
 					match = true
@@ -211,10 +212,13 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func charHandler(w http.ResponseWriter, r *http.Request) {
-	dataLock.RLock()
-	defer dataLock.RUnlock()
+	d := getAppDataSnapshot()
+	if d == nil {
+		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+		return
+	}
 	id := strings.TrimPrefix(r.URL.Path, "/char/")
-	ch, ok := charByID[id]
+	ch, ok := d.CharByID[id]
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -222,20 +226,14 @@ func charHandler(w http.ResponseWriter, r *http.Request) {
 
 	detail := CharDetail{
 		Character:     *ch,
-		SoulBreaks:    soulBreaks[ch.Name],
-		HeroAbilities: heroAbilities[ch.Name],
+		SoulBreaks:    d.SoulBreaks[ch.Name],
+		HeroAbilities: d.HeroAbilities[ch.Name],
 	}
 
 	u := getCurrentUser(r)
 	if u != nil {
 		detail.LoggedIn = true
-		userLock.RLock()
-		owned := userSoulbreaks[u.ID]
-		if owned == nil {
-			owned = make(map[string]bool)
-		}
-		detail.OwnedSoulbreaks = owned
-		userLock.RUnlock()
+		detail.OwnedSoulbreaks = snapshotOwnedSoulbreaks(u.ID)
 	} else {
 		detail.OwnedSoulbreaks = make(map[string]bool)
 	}

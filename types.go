@@ -127,6 +127,20 @@ type CharDetail struct {
 	OwnedSoulbreaks map[string]bool
 }
 
+type AppData struct {
+	Characters       []Character
+	SoulBreaks       map[string][]SoulBreak
+	HeroAbilities    map[string][]HeroAbility
+	BurstCommands    map[string][]BurstCommand
+	SynchroAbilities map[string][]SynchroAbility
+	ZenithAbilities  map[string][]ZenithAbility
+	BraveCommands    map[string]*BraveCommand
+	StatusEffects    map[string]StatusEffect
+	RealmGroups      []RealmGroup
+	CharByID         map[string]*Character
+	TierNames        []string
+}
+
 // ---------- user types & globals ----------
 
 type User struct {

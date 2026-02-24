@@ -17,15 +17,15 @@ var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
 var pctRe = regexp.MustCompile(`([+-])\d+%`)
 var forSecRe = regexp.MustCompile(`for (\d+(?:\.\d+)?) seconds`)
 
-func lookupStatus(term string) (StatusEffect, bool) {
+func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
 	// Try exact match first
-	if se, ok := statusEffects[term]; ok {
+	if se, ok := d.StatusEffects[term]; ok {
 		return se, true
 	}
 	// Fallback: replace specific percentages (+30%, -50%) with +X%/-X%
 	generic := pctRe.ReplaceAllString(term, "${1}X%")
 	if generic != term {
-		if se, ok := statusEffects[generic]; ok {
+		if se, ok := d.StatusEffects[generic]; ok {
 			// Substitute actual percentages into the description
 			// Build a list of the actual values from the term
 			actuals := pctRe.FindAllString(term, -1)
@@ -44,14 +44,14 @@ func lookupStatus(term string) (StatusEffect, bool) {
 // matchEffectsInText extracts bracketed status effects from text, inferring
 // duration from the next "for N seconds" that follows each bracket when the
 // status has no default duration.
-func matchEffectsInText(text string) []StatusEffect {
+func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 	bracketLocs := bracketRe.FindAllStringSubmatchIndex(text, -1)
 	durLocs := forSecRe.FindAllStringSubmatchIndex(text, -1)
 
 	var results []StatusEffect
 	for _, bloc := range bracketLocs {
 		term := text[bloc[2]:bloc[3]]
-		se, ok := lookupStatus(term)
+		se, ok := d.lookupStatus(term)
 		if !ok {
 			continue
 		}
@@ -70,17 +70,17 @@ func matchEffectsInText(text string) []StatusEffect {
 	return results
 }
 
-func matchSoulBreakEffects() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) matchSoulBreakEffects() {
+	for name, sbList := range d.SoulBreaks {
 		for i := range sbList {
-			sbList[i].MatchedEffects = matchEffectsInText(sbList[i].Effects)
+			sbList[i].MatchedEffects = d.matchEffectsInText(sbList[i].Effects)
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 }
 
-func pairDualShifts() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) pairDualShifts() {
+	for name, sbList := range d.SoulBreaks {
 		// Index primary DASBs by "SBVer" for this character
 		primaries := make(map[string]int) // SBVer -> index in sbList
 		for i, sb := range sbList {
@@ -106,13 +106,13 @@ func pairDualShifts() {
 					filtered = append(filtered, sb)
 				}
 			}
-			soulBreaks[name] = filtered
+			d.SoulBreaks[name] = filtered
 		}
 	}
 }
 
-func pairArcaneDyads() {
-	for name, sbList := range soulBreaks {
+func (d *AppData) pairArcaneDyads() {
+	for name, sbList := range d.SoulBreaks {
 		// Index primary ADSBs (Engaged) by "SBVer" for this character
 		primaries := make(map[string]int) // SBVer -> index in sbList
 		for i, sb := range sbList {
@@ -140,7 +140,7 @@ func pairArcaneDyads() {
 					filtered = append(filtered, sb)
 				}
 			}
-			soulBreaks[name] = filtered
+			d.SoulBreaks[name] = filtered
 		}
 	}
 }
@@ -153,9 +153,9 @@ var realmOrder = map[string]int{
 	"FFT": 17, "Type-0": 18, "KH": 19, "Beyond": 20, "Core": 21, "DB Only": 22,
 }
 
-func buildRealmGroups() {
+func (d *AppData) buildRealmGroups() {
 	grouped := make(map[string][]Character)
-	for _, c := range characters {
+	for _, c := range d.Characters {
 		grouped[c.Realm] = append(grouped[c.Realm], c)
 	}
 	for realm, chars := range grouped {
@@ -163,18 +163,18 @@ func buildRealmGroups() {
 			return chars[i].Name < chars[j].Name
 		})
 		grouped[realm] = chars
-		realmGroups = append(realmGroups, RealmGroup{Realm: realm, Characters: chars})
+		d.RealmGroups = append(d.RealmGroups, RealmGroup{Realm: realm, Characters: chars})
 	}
-	sort.Slice(realmGroups, func(i, j int) bool {
-		oi, oj := realmOrder[realmGroups[i].Realm], realmOrder[realmGroups[j].Realm]
+	sort.Slice(d.RealmGroups, func(i, j int) bool {
+		oi, oj := realmOrder[d.RealmGroups[i].Realm], realmOrder[d.RealmGroups[j].Realm]
 		if oi != oj {
 			return oi < oj
 		}
-		return realmGroups[i].Realm < realmGroups[j].Realm
+		return d.RealmGroups[i].Realm < d.RealmGroups[j].Realm
 	})
-	charByID = make(map[string]*Character)
-	for i := range characters {
-		charByID[characters[i].ID] = &characters[i]
+	d.CharByID = make(map[string]*Character)
+	for i := range d.Characters {
+		d.CharByID[d.Characters[i].ID] = &d.Characters[i]
 	}
 }
 
@@ -250,10 +250,10 @@ type imageJob struct {
 	result    *string // pointer to the Img field to update
 }
 
-func cacheAllImages() {
+func (d *AppData) cacheAllImages() {
 	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave"}
-	for _, d := range dirs {
-		os.MkdirAll(d, 0o755)
+	for _, dir := range dirs {
+		os.MkdirAll(dir, 0o755)
 	}
 
 	// Cache static brave images
@@ -274,22 +274,22 @@ func cacheAllImages() {
 	// Collect all jobs
 	var jobs []imageJob
 
-	for i := range characters {
-		jobs = append(jobs, imageJob{"images/characters", "images/characters", charFmt, characters[i].ID, &characters[i].Img})
+	for i := range d.Characters {
+		jobs = append(jobs, imageJob{"images/characters", "images/characters", charFmt, d.Characters[i].ID, &d.Characters[i].Img})
 	}
 
-	for name := range heroAbilities {
-		haList := heroAbilities[name]
+	for name := range d.HeroAbilities {
+		haList := d.HeroAbilities[name]
 		for i := range haList {
 			if haList[i].ID != "" {
 				jobs = append(jobs, imageJob{"images/hero_abilities", "images/hero_abilities", abilityFmt, haList[i].ID, &haList[i].Img})
 			}
 		}
-		heroAbilities[name] = haList
+		d.HeroAbilities[name] = haList
 	}
 
-	for name := range soulBreaks {
-		sbList := soulBreaks[name]
+	for name := range d.SoulBreaks {
+		sbList := d.SoulBreaks[name]
 		for i := range sbList {
 			if sbList[i].ID != "" {
 				jobs = append(jobs, imageJob{"images/soulbreaks", "images/soulbreaks", sbFmt, sbList[i].ID, &sbList[i].Img})
@@ -310,7 +310,7 @@ func cacheAllImages() {
 				}
 			}
 		}
-		soulBreaks[name] = sbList
+		d.SoulBreaks[name] = sbList
 	}
 
 	// Process with 20 parallel workers

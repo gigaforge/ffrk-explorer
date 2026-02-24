@@ -141,11 +141,7 @@ func saveSessions() {
 }
 
 func saveUsersJSON(path string) {
-	var userList []User
-	for _, u := range users {
-		userList = append(userList, *u)
-	}
-	sort.Slice(userList, func(i, j int) bool { return userList[i].ID < userList[j].ID })
+	userList := snapshotUsers()
 	data, err := json.Marshal(userList)
 	if err != nil {
 		log.Printf("WARNING: could not marshal users: %v", err)
@@ -157,17 +153,12 @@ func saveUsersJSON(path string) {
 }
 
 func saveUserSoulbreaksForUser(uid int) {
-	set := userSoulbreaks[uid]
 	path := filepath.Join(soulbreaksDir, strconv.Itoa(uid)+".json")
-	if len(set) == 0 {
+	ids := snapshotUserSoulbreakIDs(uid)
+	if len(ids) == 0 {
 		os.Remove(path)
 		return
 	}
-	ids := make([]string, 0, len(set))
-	for id := range set {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	data, err := json.Marshal(ids)
 	if err != nil {
 		log.Printf("WARNING: could not marshal soulbreaks for user %d: %v", uid, err)
@@ -179,9 +170,55 @@ func saveUserSoulbreaksForUser(uid int) {
 }
 
 func saveAllUserSoulbreaks() {
+	userLock.RLock()
+	uids := make([]int, 0, len(userSoulbreaks))
 	for uid := range userSoulbreaks {
+		uids = append(uids, uid)
+	}
+	userLock.RUnlock()
+	for _, uid := range uids {
 		saveUserSoulbreaksForUser(uid)
 	}
+}
+
+func snapshotUsers() []User {
+	userLock.RLock()
+	defer userLock.RUnlock()
+
+	userList := make([]User, 0, len(users))
+	for _, u := range users {
+		userList = append(userList, *u)
+	}
+	sort.Slice(userList, func(i, j int) bool { return userList[i].ID < userList[j].ID })
+	return userList
+}
+
+func snapshotUserSoulbreakIDs(uid int) []string {
+	userLock.RLock()
+	defer userLock.RUnlock()
+
+	set := userSoulbreaks[uid]
+	ids := make([]string, 0, len(set))
+	for id := range set {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func snapshotOwnedSoulbreaks(uid int) map[string]bool {
+	userLock.RLock()
+	defer userLock.RUnlock()
+
+	src := userSoulbreaks[uid]
+	if src == nil {
+		return make(map[string]bool)
+	}
+	dst := make(map[string]bool, len(src))
+	for id, owned := range src {
+		dst[id] = owned
+	}
+	return dst
 }
 
 // ---------- session management ----------

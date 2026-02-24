@@ -2,22 +2,19 @@ package main
 
 import "sync"
 
-// ---------- globals ----------
+// ---------- app data ----------
 
 var (
-	characters       []Character
-	soulBreaks       map[string][]SoulBreak      // keyed by character name
-	heroAbilities    map[string][]HeroAbility    // keyed by character name
-	burstCommands    map[string][]BurstCommand   // keyed by "Character|Source"
-	synchroAbilities map[string][]SynchroAbility // keyed by "Character|Source"
-	zenithAbilities  map[string][]ZenithAbility  // keyed by "Character|Source"
-	braveCommands    map[string]*BraveCommand    // keyed by "Character|Source"
-	statusEffects    map[string]StatusEffect     // keyed by Common Name
-	realmGroups      []RealmGroup
-	charByID         map[string]*Character
-	tierNames        []string
-	dataLock         sync.RWMutex
+	appData  *AppData
+	dataLock sync.RWMutex
 )
+
+func getAppDataSnapshot() *AppData {
+	dataLock.RLock()
+	d := appData
+	dataLock.RUnlock()
+	return d
+}
 
 // ---------- user globals ----------
 

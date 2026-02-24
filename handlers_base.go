@@ -36,16 +36,22 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	dataLock.RLock()
-	defer dataLock.RUnlock()
-	indexTmpl.Execute(w, realmGroups)
+	d := getAppDataSnapshot()
+	if d == nil {
+		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+		return
+	}
+	indexTmpl.Execute(w, d.RealmGroups)
 }
 
 func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
-	dataLock.RLock()
-	defer dataLock.RUnlock()
-	names := make([]string, len(characters))
-	for i, c := range characters {
+	d := getAppDataSnapshot()
+	if d == nil {
+		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+		return
+	}
+	names := make([]string, len(d.Characters))
+	for i, c := range d.Characters {
 		names[i] = c.Name
 	}
 	sort.Strings(names)
@@ -54,8 +60,11 @@ func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func tierAPIHandler(w http.ResponseWriter, r *http.Request) {
-	dataLock.RLock()
-	defer dataLock.RUnlock()
+	d := getAppDataSnapshot()
+	if d == nil {
+		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tierNames)
+	json.NewEncoder(w).Encode(d.TierNames)
 }
