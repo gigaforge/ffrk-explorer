@@ -146,6 +146,16 @@
   </div>
 </div>
 <script>
+function updateSearchBarHeight(){
+  var bar=document.querySelector('.search-bar');
+  if(!bar) return;
+  document.documentElement.style.setProperty('--search-bar-height', bar.offsetHeight+'px');
+}
+updateSearchBarHeight();
+window.addEventListener('resize', updateSearchBarHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(updateSearchBarHeight).observe(document.querySelector('.search-bar'));
+}
 fetch('/api/characters').then(r=>r.json()).then(names=>{
   var dl=document.getElementById('char-list');
   names.forEach(function(n){var o=document.createElement('option');o.value=n;dl.appendChild(o)});

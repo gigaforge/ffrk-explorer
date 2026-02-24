@@ -1,5 +1,6 @@
 {{define "search_bar_css"}}
 
+body { padding-top: calc(var(--search-bar-height, 58px) + 12px); }
 .search-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 100;
               background: #16213e; border-bottom: 2px solid #0f3460;
               padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 8px;
@@ -46,6 +47,22 @@
 .search-bar .auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .search-bar .auth-area .welcome { color: #e0e0e0; font-size: 14px; }
 .search-bar .auth-area button { font-size: 13px; padding: 5px 12px; }
+@media (max-width: 900px) {
+  .search-bar { padding: 8px 12px; gap: 6px; }
+  .search-bar input[type="text"] { width: 140px; }
+  .search-bar select { min-width: 88px; }
+  .search-bar button { padding: 6px 10px; }
+  .search-bar .auth-area { gap: 6px; }
+  .search-bar .auth-area .welcome { font-size: 13px; }
+}
+@media (max-width: 640px) {
+  .search-bar { padding: 8px 10px; gap: 5px; }
+  .search-bar label { font-size: 11px; }
+  .search-bar input, .search-bar select, .search-bar button { font-size: 13px; }
+  .search-bar input[type="text"] { width: 120px; }
+  .search-bar select { min-width: 78px; padding-left: 6px; padding-right: 6px; }
+  .search-bar button { padding: 5px 8px; }
+}
 .auth-modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                       background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
 .auth-modal-overlay.visible { display: flex; }
