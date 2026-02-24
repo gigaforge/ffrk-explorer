@@ -191,7 +191,7 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 <tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>Lensable</th><th>Effect</th></tr>
 {{range .LegendMateria}}
 <tr class="sb-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleDetail(this)">
-  {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()"><input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}></td>{{end}}
+  {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()">{{if ne .Tier "LM"}}<input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}>{{end}}</td>{{end}}
   <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
   <td>{{if .Img}}<img src="{{.Img}}" style="width:32px;height:32px;">{{end}}</td>
   <td>{{.Name}}{{if .LMVer}} ({{.LMVer}}){{end}}</td>

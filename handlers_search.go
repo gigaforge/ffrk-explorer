@@ -141,7 +141,7 @@ func buildSearchResults(d *AppData, chars []Character, req searchRequest, ownedS
 		totalCount = nextCount
 		truncated = haTruncated
 
-		matchedLMs, nextCount, lmTruncated := collectMatchingLegendMateria(d, c, req, totalCount, truncated)
+		matchedLMs, nextCount, lmTruncated := collectMatchingLegendMateria(d, c, req, ownedSet, totalCount, truncated)
 		totalCount = nextCount
 		truncated = lmTruncated
 
@@ -240,7 +240,11 @@ func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, ma
 	return matchedHAs, totalCount, truncated
 }
 
-func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, totalCount int, alreadyTruncated bool) ([]LegendMateria, int, bool) {
+func isLMRTier(tier string) bool {
+	return strings.Contains(tier, "LMR")
+}
+
+func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, ownedSet map[string]bool, totalCount int, alreadyTruncated bool) ([]LegendMateria, int, bool) {
 	if alreadyTruncated {
 		return nil, totalCount, true
 	}
@@ -250,6 +254,9 @@ func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, to
 
 	if !req.HasSBFilter {
 		for _, lm := range d.LegendMateria[c.Name] {
+			if req.OwnedOnly && isLMRTier(lm.Tier) && !ownedSet[lm.ID] {
+				continue
+			}
 			matchedLMs = append(matchedLMs, lm)
 			totalCount++
 			if totalCount >= maxSearchResults {
@@ -265,6 +272,9 @@ func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, to
 	}
 
 	for _, lm := range d.LegendMateria[c.Name] {
+		if req.OwnedOnly && isLMRTier(lm.Tier) && !ownedSet[lm.ID] {
+			continue
+		}
 		match := false
 		if req.Element != "" && textContainsAttach(lm.Effect, req.Element) {
 			match = true
