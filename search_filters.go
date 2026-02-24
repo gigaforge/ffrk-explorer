@@ -205,6 +205,20 @@ func sbMatchesAdditionalEffects(sb SoulBreak, effects []string) bool {
 	return true
 }
 
+// lmMatchesAdditionalEffects checks if a legend materia matches ALL of the given effect filters.
+func lmMatchesAdditionalEffects(lm LegendMateria, effects []string) bool {
+	for _, eff := range effects {
+		checker, ok := effectCheckers[eff]
+		if !ok {
+			continue
+		}
+		if !checker(lm.Effect) {
+			return false
+		}
+	}
+	return true
+}
+
 // haMatchesAdditionalEffects checks if a hero ability matches ALL of the given effect filters.
 func haMatchesAdditionalEffects(ha HeroAbility, effects []string) bool {
 	for _, eff := range effects {

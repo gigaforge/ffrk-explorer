@@ -141,11 +141,16 @@ func buildSearchResults(d *AppData, chars []Character, req searchRequest, ownedS
 		totalCount = nextCount
 		truncated = haTruncated
 
-		if len(matchedSBs) > 0 || len(matchedHAs) > 0 {
+		matchedLMs, nextCount, lmTruncated := collectMatchingLegendMateria(d, c, req, totalCount, truncated)
+		totalCount = nextCount
+		truncated = lmTruncated
+
+		if len(matchedSBs) > 0 || len(matchedHAs) > 0 || len(matchedLMs) > 0 {
 			results = append(results, SearchResult{
 				Character:     c,
 				SoulBreaks:    matchedSBs,
 				HeroAbilities: matchedHAs,
+				LegendMateria: matchedLMs,
 			})
 		}
 	}
@@ -235,6 +240,56 @@ func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, ma
 	return matchedHAs, totalCount, truncated
 }
 
+func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, totalCount int, alreadyTruncated bool) ([]LegendMateria, int, bool) {
+	if alreadyTruncated {
+		return nil, totalCount, true
+	}
+
+	var matchedLMs []LegendMateria
+	truncated := false
+
+	if !req.HasSBFilter {
+		for _, lm := range d.LegendMateria[c.Name] {
+			matchedLMs = append(matchedLMs, lm)
+			totalCount++
+			if totalCount >= maxSearchResults {
+				truncated = true
+				break
+			}
+		}
+		return matchedLMs, totalCount, truncated
+	}
+
+	if !req.HasEffectFilter {
+		return nil, totalCount, false
+	}
+
+	for _, lm := range d.LegendMateria[c.Name] {
+		match := false
+		if req.Element != "" && textContainsAttach(lm.Effect, req.Element) {
+			match = true
+		}
+		if req.Imperil != "" && textContainsImperil(lm.Effect, req.Imperil) {
+			match = true
+		}
+		if len(req.AdditionalEffects) > 0 && lmMatchesAdditionalEffects(lm, req.AdditionalEffects) {
+			match = true
+		}
+		if !match {
+			continue
+		}
+
+		matchedLMs = append(matchedLMs, lm)
+		totalCount++
+		if totalCount >= maxSearchResults {
+			truncated = true
+			break
+		}
+	}
+
+	return matchedLMs, totalCount, truncated
+}
+
 func buildSearchData(req searchRequest, results []SearchResult, truncated bool, u *User, ownedSet map[string]bool) SearchData {
 	data := SearchData{
 		Results:    results,
@@ -303,6 +358,7 @@ func charHandler(w http.ResponseWriter, r *http.Request) {
 		Character:     *ch,
 		SoulBreaks:    d.SoulBreaks[ch.Name],
 		HeroAbilities: d.HeroAbilities[ch.Name],
+		LegendMateria: d.LegendMateria[ch.Name],
 	}
 
 	u := getCurrentUser(r)

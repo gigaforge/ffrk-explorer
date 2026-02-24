@@ -60,10 +60,14 @@ func buildAppDataFromCSVDir(dir string) (*AppData, error) {
 	if err := d.loadTriggerAbilities(); err != nil {
 		return nil, fmt.Errorf("load trigger abilities: %w", err)
 	}
+	if err := d.loadLegendMateria(); err != nil {
+		return nil, fmt.Errorf("load legend materia: %w", err)
+	}
 	if err := d.loadStatuses(); err != nil {
 		return nil, fmt.Errorf("load statuses: %w", err)
 	}
 	d.matchSoulBreakEffects()
+	d.matchLegendMateriaEffects()
 	d.pairDualShifts()
 	d.pairArcaneDyads()
 	d.matchBurstCommands()
@@ -581,6 +585,38 @@ func (d *AppData) matchTriggerAbilities() {
 			}
 		}
 		d.SoulBreaks[name] = sbList
+	}
+}
+
+func (d *AppData) loadLegendMateria() error {
+	d.LegendMateria = make(map[string][]LegendMateria)
+	rows, err := d.readCSV("Legend-Materia.csv")
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		lm := LegendMateria{
+			Img:      row["Img"],
+			Name:     row["Name"],
+			Tier:     row["Tier"],
+			LMVer:    row["LM Ver"],
+			Effect:   row["Effect"],
+			Lensable: row["Anima"] != "",
+			ID:       row["ID"],
+		}
+		ch := row["Character"]
+		d.LegendMateria[ch] = append(d.LegendMateria[ch], lm)
+	}
+	log.Printf("Loaded %d legend materia groups", len(d.LegendMateria))
+	return nil
+}
+
+func (d *AppData) matchLegendMateriaEffects() {
+	for name, lmList := range d.LegendMateria {
+		for i := range lmList {
+			lmList[i].Effect, lmList[i].MatchedEffects = d.matchAndBracketEffectsInText(lmList[i].Effect)
+		}
+		d.LegendMateria[name] = lmList
 	}
 }
 

@@ -126,10 +126,22 @@ type HeroAbility struct {
 	ID        string
 }
 
+type LegendMateria struct {
+	Img            string
+	Name           string
+	Tier           string
+	LMVer          string
+	Effect         string
+	Lensable       bool
+	ID             string
+	MatchedEffects []StatusEffect
+}
+
 type SearchResult struct {
-	Character     Character
-	HeroAbilities []HeroAbility
-	SoulBreaks    []SoulBreak
+	Character      Character
+	HeroAbilities  []HeroAbility
+	LegendMateria  []LegendMateria
+	SoulBreaks     []SoulBreak
 }
 
 type RealmGroup struct {
@@ -141,6 +153,7 @@ type CharDetail struct {
 	Character       Character
 	SoulBreaks      []SoulBreak
 	HeroAbilities   []HeroAbility
+	LegendMateria   []LegendMateria
 	LoggedIn        bool
 	OwnedSoulbreaks map[string]bool
 }
@@ -155,6 +168,7 @@ type AppData struct {
 	ZenithAbilities  map[string][]ZenithAbility
 	BraveCommands    map[string]*BraveCommand
 	TriggerAbilities map[string][]TriggerAbility // sbName → []TriggerAbility
+	LegendMateria    map[string][]LegendMateria  // character → []LegendMateria
 	StatusEffects    map[string]StatusEffect
 	statusMatchTerms []string
 	RealmGroups      []RealmGroup

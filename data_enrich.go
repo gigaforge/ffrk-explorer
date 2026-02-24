@@ -422,7 +422,7 @@ type imageJob struct {
 }
 
 func (d *AppData) cacheAllImages() {
-	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave", "images/trigger"}
+	dirs := []string{"images/characters", "images/abilities", "images/hero_abilities", "images/soulbreaks", "images/burst", "images/synchro", "images/zenith", "images/brave", "images/trigger", "images/legend_materia"}
 	for _, dir := range dirs {
 		os.MkdirAll(dir, 0o755)
 	}
@@ -443,6 +443,7 @@ func (d *AppData) cacheAllImages() {
 		sbFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/soulstrike/%s/%s_256.png"
 		burstFmt   = "https://dff.sp.mbga.jp/dff/static/lang/image/ability/%s/%s_128.png"
 		synchroFmt = "https://dff.sp.mbga.jp/dff/static/lang/image/synchro/%s.png"
+		lmFmt      = "https://dff.sp.mbga.jp/dff/static/lang/image/legend_materia/%s/%s_128.png"
 	)
 
 	// Collect all jobs
@@ -460,6 +461,16 @@ func (d *AppData) cacheAllImages() {
 			}
 		}
 		d.HeroAbilities[name] = haList
+	}
+
+	for name := range d.LegendMateria {
+		lmList := d.LegendMateria[name]
+		for i := range lmList {
+			if lmList[i].ID != "" {
+				jobs = append(jobs, imageJob{"images/legend_materia", "images/legend_materia", lmFmt, lmList[i].ID, &lmList[i].Img})
+			}
+		}
+		d.LegendMateria[name] = lmList
 	}
 
 	for name := range d.SoulBreaks {

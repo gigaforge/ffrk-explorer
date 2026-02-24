@@ -39,6 +39,7 @@ var csvSheets = []csvSheet{
 	{"Zenith-SB-Abilities.csv", "1801274757", []string{"Character", "Source", "Name"}},
 	{"Brave.csv", "1286318057", []string{"Character", "Source", "Name"}},
 	{"Trigger-Abilities.csv", "2001933731", []string{"Source Type", "Source", "Name"}},
+	{"Legend-Materia.csv", "1881349203", []string{"Character", "Name", "Tier"}},
 	{"Status.csv", "1899148923", []string{"Common Name", "Effects"}},
 }
 
