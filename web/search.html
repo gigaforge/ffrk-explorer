@@ -172,7 +172,7 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 
 {{if .HeroAbilities}}
 <table>
-<tr><th></th><th>Name</th><th>School</th><th>Type</th><th>Element</th><th>Effects</th></tr>
+<tr><th></th><th>Name</th><th>School</th><th>Type</th><th>Element</th><th>Time</th><th>SB</th><th>Effects</th></tr>
 {{range .HeroAbilities}}
 <tr>
   <td>{{if .Img}}<img src="{{.Img}}">{{end}}</td>
@@ -180,6 +180,8 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
   <td>{{.School}}</td>
   <td>{{.Type}}</td>
   <td>{{.Element}}</td>
+  <td>{{.Time}}</td>
+  <td>{{.SB}}</td>
   <td class="effects">{{.Effects}}</td>
 </tr>
 {{end}}

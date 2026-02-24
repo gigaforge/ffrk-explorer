@@ -279,6 +279,7 @@ func (d *AppData) loadHeroAbilities() error {
 			Time:      row["Time"],
 			Effects:   row["Effects"],
 			School:    row["School"],
+			SB:        row["SB"],
 			ID:        row["ID"],
 		}
 		d.HeroAbilities[ha.Character] = append(d.HeroAbilities[ha.Character], ha)

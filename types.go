@@ -105,6 +105,7 @@ type HeroAbility struct {
 	Time      string
 	Effects   string
 	School    string
+	SB        string
 	ID        string
 }
 
