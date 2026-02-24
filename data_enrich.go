@@ -70,17 +70,36 @@ func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 	return results
 }
 
-func (d *AppData) matchSoulBreakEffects() {
+func (d *AppData) rewriteSoulBreakLists(rewrite func([]SoulBreak) []SoulBreak) {
 	for name, sbList := range d.SoulBreaks {
-		for i := range sbList {
-			sbList[i].MatchedEffects = d.matchEffectsInText(sbList[i].Effects)
-		}
-		d.SoulBreaks[name] = sbList
+		d.SoulBreaks[name] = rewrite(sbList)
 	}
 }
 
+func filterSoulBreaksByRemovedIndex(sbList []SoulBreak, remove map[int]bool) []SoulBreak {
+	if len(remove) == 0 {
+		return sbList
+	}
+	filtered := make([]SoulBreak, 0, len(sbList)-len(remove))
+	for i, sb := range sbList {
+		if !remove[i] {
+			filtered = append(filtered, sb)
+		}
+	}
+	return filtered
+}
+
+func (d *AppData) matchSoulBreakEffects() {
+	d.rewriteSoulBreakLists(func(sbList []SoulBreak) []SoulBreak {
+		for i := range sbList {
+			sbList[i].MatchedEffects = d.matchEffectsInText(sbList[i].Effects)
+		}
+		return sbList
+	})
+}
+
 func (d *AppData) pairDualShifts() {
-	for name, sbList := range d.SoulBreaks {
+	d.rewriteSoulBreakLists(func(sbList []SoulBreak) []SoulBreak {
 		// Index primary DASBs by "SBVer" for this character
 		primaries := make(map[string]int) // SBVer -> index in sbList
 		for i, sb := range sbList {
@@ -99,20 +118,12 @@ func (d *AppData) pairDualShifts() {
 				}
 			}
 		}
-		if len(remove) > 0 {
-			var filtered []SoulBreak
-			for i, sb := range sbList {
-				if !remove[i] {
-					filtered = append(filtered, sb)
-				}
-			}
-			d.SoulBreaks[name] = filtered
-		}
-	}
+		return filterSoulBreaksByRemovedIndex(sbList, remove)
+	})
 }
 
 func (d *AppData) pairArcaneDyads() {
-	for name, sbList := range d.SoulBreaks {
+	d.rewriteSoulBreakLists(func(sbList []SoulBreak) []SoulBreak {
 		// Index primary ADSBs (Engaged) by "SBVer" for this character
 		primaries := make(map[string]int) // SBVer -> index in sbList
 		for i, sb := range sbList {
@@ -133,16 +144,8 @@ func (d *AppData) pairArcaneDyads() {
 				}
 			}
 		}
-		if len(remove) > 0 {
-			var filtered []SoulBreak
-			for i, sb := range sbList {
-				if !remove[i] {
-					filtered = append(filtered, sb)
-				}
-			}
-			d.SoulBreaks[name] = filtered
-		}
-	}
+		return filterSoulBreaksByRemovedIndex(sbList, remove)
+	})
 }
 
 // Preferred realm display order (roughly follows mainline game numbering)

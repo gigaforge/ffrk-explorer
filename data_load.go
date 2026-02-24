@@ -2,35 +2,64 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-func reloadData() {
-	next := buildAppData()
+func reloadData() error {
+	next, err := buildAppData()
+	if err != nil {
+		return err
+	}
 
 	dataLock.Lock()
 	appData = next
 	dataLock.Unlock()
 
 	log.Printf("Reloaded %d characters", len(next.Characters))
+	return nil
 }
 
-func buildAppData() *AppData {
-	d := &AppData{}
-	d.loadCharacters()
-	d.applyRecordSphereUpgrades()
-	d.loadSoulBreaks()
-	d.loadHeroAbilities()
-	d.loadBurstCommands()
-	d.loadSynchroAbilities()
-	d.loadZenithAbilities()
-	d.loadBraveCommands()
-	d.loadStatuses()
+func buildAppData() (*AppData, error) {
+	return buildAppDataFromCSVDir(csvDir)
+}
+
+func buildAppDataFromCSVDir(dir string) (*AppData, error) {
+	d := &AppData{csvDir: dir}
+	if err := d.loadCharacters(); err != nil {
+		return nil, fmt.Errorf("load characters: %w", err)
+	}
+	if err := d.applyRecordSphereUpgrades(); err != nil {
+		return nil, fmt.Errorf("apply record sphere upgrades: %w", err)
+	}
+	if err := d.loadSoulBreaks(); err != nil {
+		return nil, fmt.Errorf("load soul breaks: %w", err)
+	}
+	if err := d.loadHeroAbilities(); err != nil {
+		return nil, fmt.Errorf("load hero abilities: %w", err)
+	}
+	if err := d.loadBurstCommands(); err != nil {
+		return nil, fmt.Errorf("load burst commands: %w", err)
+	}
+	if err := d.loadSynchroAbilities(); err != nil {
+		return nil, fmt.Errorf("load synchro abilities: %w", err)
+	}
+	if err := d.loadZenithAbilities(); err != nil {
+		return nil, fmt.Errorf("load zenith abilities: %w", err)
+	}
+	if err := d.loadBraveCommands(); err != nil {
+		return nil, fmt.Errorf("load brave commands: %w", err)
+	}
+	if err := d.loadStatuses(); err != nil {
+		return nil, fmt.Errorf("load statuses: %w", err)
+	}
 	d.matchSoulBreakEffects()
 	d.pairDualShifts()
 	d.pairArcaneDyads()
@@ -40,26 +69,25 @@ func buildAppData() *AppData {
 	d.matchBraveCommands()
 	d.cacheAllImages()
 	d.buildRealmGroups()
-	return d
+	return d, nil
 }
 
 // ---------- CSV loading ----------
 
-func mustReadCSV(path string) []map[string]string {
-	resolved := csvPath(path)
+func readCSVResolved(resolved string) ([]map[string]string, error) {
 	f, err := os.Open(resolved)
 	if err != nil {
-		log.Fatalf("open %s: %v", resolved, err)
+		return nil, fmt.Errorf("open %s: %w", resolved, err)
 	}
 	defer f.Close()
 	r := csv.NewReader(f)
 	r.LazyQuotes = true
 	records, err := r.ReadAll()
 	if err != nil {
-		log.Fatalf("read %s: %v", resolved, err)
+		return nil, fmt.Errorf("read %s: %w", resolved, err)
 	}
 	if len(records) < 2 {
-		return nil
+		return nil, nil
 	}
 	header := records[0]
 	var rows []map[string]string
@@ -72,7 +100,22 @@ func mustReadCSV(path string) []map[string]string {
 		}
 		rows = append(rows, row)
 	}
-	return rows
+	return rows, nil
+}
+
+func readCSV(path string) ([]map[string]string, error) {
+	return readCSVResolved(csvPath(path))
+}
+
+func (d *AppData) csvPath(name string) string {
+	if d != nil && d.csvDir != "" {
+		return filepath.Join(d.csvDir, name)
+	}
+	return csvPath(name)
+}
+
+func (d *AppData) readCSV(path string) ([]map[string]string, error) {
+	return readCSVResolved(d.csvPath(path))
 }
 
 var schoolNames = []string{
@@ -82,8 +125,11 @@ var schoolNames = []string{
 	"Machinist", "Darkness", "Sharpshooter", "Witch", "Heavy",
 }
 
-func (d *AppData) loadCharacters() {
-	rows := mustReadCSV("Characters.csv")
+func (d *AppData) loadCharacters() error {
+	rows, err := d.readCSV("Characters.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		c := Character{
 			Realm:   row["Realm"],
@@ -106,15 +152,23 @@ func (d *AppData) loadCharacters() {
 		}
 		d.Characters = append(d.Characters, c)
 	}
+	return nil
 }
 
 var recordSphereUpgradeRE = regexp.MustCompile(`^(.+?)\s+(\d)★\s*->\s*(\d)★$`)
 
-func (d *AppData) applyRecordSphereUpgrades() {
-	if _, err := os.Stat(csvPath("Record-Spheres.csv")); err != nil {
-		return
+func (d *AppData) applyRecordSphereUpgrades() error {
+	recordSpheresPath := d.csvPath("Record-Spheres.csv")
+	if _, err := os.Stat(recordSpheresPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("stat %s: %w", recordSpheresPath, err)
 	}
-	rows := mustReadCSV("Record-Spheres.csv")
+	rows, err := d.readCSV("Record-Spheres.csv")
+	if err != nil {
+		return err
+	}
 
 	// Build name -> index lookup for d.Characters
 	charIndex := make(map[string]int, len(d.Characters))
@@ -150,6 +204,7 @@ func (d *AppData) applyRecordSphereUpgrades() {
 		}
 	}
 	log.Printf("Applied %d record sphere school upgrades", upgrades)
+	return nil
 }
 
 var invalidTiers = map[string]bool{
@@ -174,10 +229,13 @@ func isValidTier(s string) bool {
 	return hasUpper
 }
 
-func (d *AppData) loadSoulBreaks() {
+func (d *AppData) loadSoulBreaks() error {
 	d.SoulBreaks = make(map[string][]SoulBreak)
 	tierSet := make(map[string]bool)
-	rows := mustReadCSV("Soul-Breaks.csv")
+	rows, err := d.readCSV("Soul-Breaks.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		sb := SoulBreak{
 			Character: row["Character"],
@@ -201,11 +259,15 @@ func (d *AppData) loadSoulBreaks() {
 		d.TierNames = append(d.TierNames, t)
 	}
 	sort.Strings(d.TierNames)
+	return nil
 }
 
-func (d *AppData) loadHeroAbilities() {
+func (d *AppData) loadHeroAbilities() error {
 	d.HeroAbilities = make(map[string][]HeroAbility)
-	rows := mustReadCSV("Hero-Abilities.csv")
+	rows, err := d.readCSV("Hero-Abilities.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		ha := HeroAbility{
 			Character: row["Character"],
@@ -221,11 +283,64 @@ func (d *AppData) loadHeroAbilities() {
 		}
 		d.HeroAbilities[ha.Character] = append(d.HeroAbilities[ha.Character], ha)
 	}
+	return nil
 }
 
-func (d *AppData) loadBurstCommands() {
+func sbGroupKey(character, source string) string {
+	return character + "|" + source
+}
+
+func cloneWithMatchedEffects[T any](d *AppData, src []T, effects func(T) string, setMatched func(*T, []StatusEffect)) []T {
+	matched := make([]T, len(src))
+	copy(matched, src)
+	for i := range matched {
+		setMatched(&matched[i], d.matchEffectsInText(effects(matched[i])))
+	}
+	return matched
+}
+
+func attachTieredChildSlice[T any](
+	d *AppData,
+	tier string,
+	groups map[string][]T,
+	effects func(T) string,
+	setMatched func(*T, []StatusEffect),
+	assign func(*SoulBreak, []T),
+) {
+	for name, sbList := range d.SoulBreaks {
+		for i := range sbList {
+			sb := &sbList[i]
+			if sb.Tier != tier {
+				continue
+			}
+			key := sbGroupKey(sb.Character, sb.Name)
+			if children, ok := groups[key]; ok {
+				assign(sb, cloneWithMatchedEffects(d, children, effects, setMatched))
+			}
+		}
+		d.SoulBreaks[name] = sbList
+	}
+}
+
+func (d *AppData) cloneMatchedBraveCommand(src *BraveCommand) *BraveCommand {
+	if src == nil {
+		return nil
+	}
+	matched := *src
+	matched.Levels = make([]BraveLevel, len(src.Levels))
+	copy(matched.Levels, src.Levels)
+	for i := range matched.Levels {
+		matched.Levels[i].MatchedEffects = d.matchEffectsInText(matched.Levels[i].Effects)
+	}
+	return &matched
+}
+
+func (d *AppData) loadBurstCommands() error {
 	d.BurstCommands = make(map[string][]BurstCommand)
-	rows := mustReadCSV("Burst.csv")
+	rows, err := d.readCSV("Burst.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		bc := BurstCommand{
 			Name:    row["Name"],
@@ -237,7 +352,7 @@ func (d *AppData) loadBurstCommands() {
 			School:  row["School"],
 			ID:      row["ID"],
 		}
-		key := row["Character"] + "|" + row["Source"]
+		key := sbGroupKey(row["Character"], row["Source"])
 		d.BurstCommands[key] = append(d.BurstCommands[key], bc)
 	}
 	// Sort each group so ID ending in '1' comes before '2'
@@ -248,32 +363,26 @@ func (d *AppData) loadBurstCommands() {
 		d.BurstCommands[key] = cmds
 	}
 	log.Printf("Loaded %d burst command groups", len(d.BurstCommands))
+	return nil
 }
 
 func (d *AppData) matchBurstCommands() {
-	for name, sbList := range d.SoulBreaks {
-		for i := range sbList {
-			if sbList[i].Tier != "BSB" {
-				continue
-			}
-			key := sbList[i].Character + "|" + sbList[i].Name
-			if cmds, ok := d.BurstCommands[key]; ok {
-				// Deep copy and match status effects for each command
-				matched := make([]BurstCommand, len(cmds))
-				copy(matched, cmds)
-				for j := range matched {
-					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
-				}
-				sbList[i].BurstCommands = matched
-			}
-		}
-		d.SoulBreaks[name] = sbList
-	}
+	attachTieredChildSlice(
+		d,
+		"BSB",
+		d.BurstCommands,
+		func(bc BurstCommand) string { return bc.Effects },
+		func(bc *BurstCommand, matched []StatusEffect) { bc.MatchedEffects = matched },
+		func(sb *SoulBreak, matched []BurstCommand) { sb.BurstCommands = matched },
+	)
 }
 
-func (d *AppData) loadSynchroAbilities() {
+func (d *AppData) loadSynchroAbilities() error {
 	d.SynchroAbilities = make(map[string][]SynchroAbility)
-	rows := mustReadCSV("Synchro.csv")
+	rows, err := d.readCSV("Synchro.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		sa := SynchroAbility{
 			Name:        row["Name"],
@@ -288,7 +397,7 @@ func (d *AppData) loadSynchroAbilities() {
 			ID:          row["ID"],
 			ConditionID: row["Synchro Condition ID"],
 		}
-		key := row["Character"] + "|" + row["Source"]
+		key := sbGroupKey(row["Character"], row["Source"])
 		d.SynchroAbilities[key] = append(d.SynchroAbilities[key], sa)
 	}
 	for key, abs := range d.SynchroAbilities {
@@ -298,31 +407,26 @@ func (d *AppData) loadSynchroAbilities() {
 		d.SynchroAbilities[key] = abs
 	}
 	log.Printf("Loaded %d synchro ability groups", len(d.SynchroAbilities))
+	return nil
 }
 
 func (d *AppData) matchSynchroAbilities() {
-	for name, sbList := range d.SoulBreaks {
-		for i := range sbList {
-			if sbList[i].Tier != "SASB" {
-				continue
-			}
-			key := sbList[i].Character + "|" + sbList[i].Name
-			if abs, ok := d.SynchroAbilities[key]; ok {
-				matched := make([]SynchroAbility, len(abs))
-				copy(matched, abs)
-				for j := range matched {
-					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
-				}
-				sbList[i].SynchroAbilities = matched
-			}
-		}
-		d.SoulBreaks[name] = sbList
-	}
+	attachTieredChildSlice(
+		d,
+		"SASB",
+		d.SynchroAbilities,
+		func(sa SynchroAbility) string { return sa.Effects },
+		func(sa *SynchroAbility, matched []StatusEffect) { sa.MatchedEffects = matched },
+		func(sb *SoulBreak, matched []SynchroAbility) { sb.SynchroAbilities = matched },
+	)
 }
 
-func (d *AppData) loadZenithAbilities() {
+func (d *AppData) loadZenithAbilities() error {
 	d.ZenithAbilities = make(map[string][]ZenithAbility)
-	rows := mustReadCSV("Zenith-SB-Abilities.csv")
+	rows, err := d.readCSV("Zenith-SB-Abilities.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		za := ZenithAbility{
 			Name:    row["Name"],
@@ -334,37 +438,32 @@ func (d *AppData) loadZenithAbilities() {
 			School:  row["School"],
 			ID:      row["ID"],
 		}
-		key := row["Character"] + "|" + row["Source"]
+		key := sbGroupKey(row["Character"], row["Source"])
 		d.ZenithAbilities[key] = append(d.ZenithAbilities[key], za)
 	}
 	log.Printf("Loaded %d zenith ability groups", len(d.ZenithAbilities))
+	return nil
 }
 
 func (d *AppData) matchZenithAbilities() {
-	for name, sbList := range d.SoulBreaks {
-		for i := range sbList {
-			if sbList[i].Tier != "ZSB" {
-				continue
-			}
-			key := sbList[i].Character + "|" + sbList[i].Name
-			if abs, ok := d.ZenithAbilities[key]; ok {
-				matched := make([]ZenithAbility, len(abs))
-				copy(matched, abs)
-				for j := range matched {
-					matched[j].MatchedEffects = d.matchEffectsInText(matched[j].Effects)
-				}
-				sbList[i].ZenithAbilities = matched
-			}
-		}
-		d.SoulBreaks[name] = sbList
-	}
+	attachTieredChildSlice(
+		d,
+		"ZSB",
+		d.ZenithAbilities,
+		func(za ZenithAbility) string { return za.Effects },
+		func(za *ZenithAbility, matched []StatusEffect) { za.MatchedEffects = matched },
+		func(sb *SoulBreak, matched []ZenithAbility) { sb.ZenithAbilities = matched },
+	)
 }
 
-func (d *AppData) loadBraveCommands() {
+func (d *AppData) loadBraveCommands() error {
 	d.BraveCommands = make(map[string]*BraveCommand)
-	rows := mustReadCSV("Brave.csv")
+	rows, err := d.readCSV("Brave.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
-		key := row["Character"] + "|" + row["Source"]
+		key := sbGroupKey(row["Character"], row["Source"])
 		bc, ok := d.BraveCommands[key]
 		if !ok {
 			bc = &BraveCommand{
@@ -391,6 +490,7 @@ func (d *AppData) loadBraveCommands() {
 		})
 	}
 	log.Printf("Loaded %d brave commands", len(d.BraveCommands))
+	return nil
 }
 
 func (d *AppData) matchBraveCommands() {
@@ -399,24 +499,21 @@ func (d *AppData) matchBraveCommands() {
 			if !strings.Contains(sbList[i].Effects, "[Brave Mode]") {
 				continue
 			}
-			key := sbList[i].Character + "|" + sbList[i].Name
+			key := sbGroupKey(sbList[i].Character, sbList[i].Name)
 			if bc, ok := d.BraveCommands[key]; ok {
-				matched := *bc
-				matched.Levels = make([]BraveLevel, len(bc.Levels))
-				copy(matched.Levels, bc.Levels)
-				for j := range matched.Levels {
-					matched.Levels[j].MatchedEffects = d.matchEffectsInText(matched.Levels[j].Effects)
-				}
-				sbList[i].BraveCommand = &matched
+				sbList[i].BraveCommand = d.cloneMatchedBraveCommand(bc)
 			}
 		}
 		d.SoulBreaks[name] = sbList
 	}
 }
 
-func (d *AppData) loadStatuses() {
+func (d *AppData) loadStatuses() error {
 	d.StatusEffects = make(map[string]StatusEffect)
-	rows := mustReadCSV("Status.csv")
+	rows, err := d.readCSV("Status.csv")
+	if err != nil {
+		return err
+	}
 	for _, row := range rows {
 		name := strings.TrimSpace(row["Common Name"])
 		if name == "" {
@@ -429,4 +526,5 @@ func (d *AppData) loadStatuses() {
 		}
 	}
 	log.Printf("Loaded %d status effects", len(d.StatusEffects))
+	return nil
 }

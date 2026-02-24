@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"encoding/json"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -36,18 +35,16 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	d := getAppDataSnapshot()
-	if d == nil {
-		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+	d, ok := requireAppData(w)
+	if !ok {
 		return
 	}
 	indexTmpl.Execute(w, d.RealmGroups)
 }
 
 func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
-	d := getAppDataSnapshot()
-	if d == nil {
-		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+	d, ok := requireAppData(w)
+	if !ok {
 		return
 	}
 	names := make([]string, len(d.Characters))
@@ -55,16 +52,13 @@ func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
 		names[i] = c.Name
 	}
 	sort.Strings(names)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(names)
+	writeJSON(w, http.StatusOK, names)
 }
 
 func tierAPIHandler(w http.ResponseWriter, r *http.Request) {
-	d := getAppDataSnapshot()
-	if d == nil {
-		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+	d, ok := requireAppData(w)
+	if !ok {
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(d.TierNames)
+	writeJSON(w, http.StatusOK, d.TierNames)
 }

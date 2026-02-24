@@ -106,69 +106,98 @@ var effectCheckers = map[string]func(string) bool{
 	},
 }
 
-// collectAllText gathers the SB's effects text, its sub-ability effects, and
-// all matched status effect descriptions into a single combined string.
-func collectSBTexts(sb SoulBreak) []string {
-	texts := []string{sb.Effects}
-	for _, se := range sb.MatchedEffects {
-		texts = append(texts, se.Name, se.Description)
+type sbTextWalkOptions struct {
+	IncludeStatuses bool
+	IncludeBrave    bool
+}
+
+func walkStatusEffectTexts(statuses []StatusEffect, visit func(string) bool) bool {
+	for _, se := range statuses {
+		if visit(se.Name) || visit(se.Description) {
+			return true
+		}
 	}
+	return false
+}
+
+func walkSBTexts(sb SoulBreak, opts sbTextWalkOptions, visit func(string) bool) bool {
+	if visit(sb.Effects) {
+		return true
+	}
+	if opts.IncludeStatuses && walkStatusEffectTexts(sb.MatchedEffects, visit) {
+		return true
+	}
+
 	if sb.DualShift != nil {
-		texts = append(texts, sb.DualShift.Effects)
-		for _, se := range sb.DualShift.MatchedEffects {
-			texts = append(texts, se.Name, se.Description)
+		if visit(sb.DualShift.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(sb.DualShift.MatchedEffects, visit) {
+			return true
 		}
 	}
+
 	if sb.ArcaneDyad != nil {
-		texts = append(texts, sb.ArcaneDyad.Effects)
-		for _, se := range sb.ArcaneDyad.MatchedEffects {
-			texts = append(texts, se.Name, se.Description)
+		if visit(sb.ArcaneDyad.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(sb.ArcaneDyad.MatchedEffects, visit) {
+			return true
 		}
 	}
+
 	for _, bc := range sb.BurstCommands {
-		texts = append(texts, bc.Effects)
-		for _, se := range bc.MatchedEffects {
-			texts = append(texts, se.Name, se.Description)
+		if visit(bc.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(bc.MatchedEffects, visit) {
+			return true
 		}
 	}
+
 	for _, sa := range sb.SynchroAbilities {
-		texts = append(texts, sa.Effects)
-		for _, se := range sa.MatchedEffects {
-			texts = append(texts, se.Name, se.Description)
+		if visit(sa.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(sa.MatchedEffects, visit) {
+			return true
 		}
 	}
+
 	for _, za := range sb.ZenithAbilities {
-		texts = append(texts, za.Effects)
-		for _, se := range za.MatchedEffects {
-			texts = append(texts, se.Name, se.Description)
+		if visit(za.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(za.MatchedEffects, visit) {
+			return true
 		}
 	}
-	if sb.BraveCommand != nil {
+
+	if opts.IncludeBrave && sb.BraveCommand != nil {
 		for _, bl := range sb.BraveCommand.Levels {
-			texts = append(texts, bl.Effects)
-			for _, se := range bl.MatchedEffects {
-				texts = append(texts, se.Name, se.Description)
+			if visit(bl.Effects) {
+				return true
+			}
+			if opts.IncludeStatuses && walkStatusEffectTexts(bl.MatchedEffects, visit) {
+				return true
 			}
 		}
 	}
-	return texts
+
+	return false
 }
 
 // sbMatchesAdditionalEffects checks if a soul break matches ALL of the given effect filters.
 func sbMatchesAdditionalEffects(sb SoulBreak, effects []string) bool {
-	texts := collectSBTexts(sb)
 	for _, eff := range effects {
 		checker, ok := effectCheckers[eff]
 		if !ok {
 			continue
 		}
-		found := false
-		for _, t := range texts {
-			if checker(t) {
-				found = true
-				break
-			}
-		}
+		found := walkSBTexts(sb, sbTextWalkOptions{
+			IncludeStatuses: true,
+			IncludeBrave:    true,
+		}, checker)
 		if !found {
 			return false
 		}
@@ -209,58 +238,14 @@ func textContainsImperil(text, element string) bool {
 
 // sbMatchesElement checks if a soul break (including sub-abilities) matches en-element criteria
 func sbMatchesElement(sb SoulBreak, element string) bool {
-	if textContainsAttach(sb.Effects, element) {
-		return true
-	}
-	if sb.DualShift != nil && textContainsAttach(sb.DualShift.Effects, element) {
-		return true
-	}
-	if sb.ArcaneDyad != nil && textContainsAttach(sb.ArcaneDyad.Effects, element) {
-		return true
-	}
-	for _, bc := range sb.BurstCommands {
-		if textContainsAttach(bc.Effects, element) {
-			return true
-		}
-	}
-	for _, sa := range sb.SynchroAbilities {
-		if textContainsAttach(sa.Effects, element) {
-			return true
-		}
-	}
-	for _, za := range sb.ZenithAbilities {
-		if textContainsAttach(za.Effects, element) {
-			return true
-		}
-	}
-	return false
+	return walkSBTexts(sb, sbTextWalkOptions{}, func(text string) bool {
+		return textContainsAttach(text, element)
+	})
 }
 
 // sbMatchesImperil checks if a soul break (including sub-abilities) matches imperil criteria
 func sbMatchesImperil(sb SoulBreak, element string) bool {
-	if textContainsImperil(sb.Effects, element) {
-		return true
-	}
-	if sb.DualShift != nil && textContainsImperil(sb.DualShift.Effects, element) {
-		return true
-	}
-	if sb.ArcaneDyad != nil && textContainsImperil(sb.ArcaneDyad.Effects, element) {
-		return true
-	}
-	for _, bc := range sb.BurstCommands {
-		if textContainsImperil(bc.Effects, element) {
-			return true
-		}
-	}
-	for _, sa := range sb.SynchroAbilities {
-		if textContainsImperil(sa.Effects, element) {
-			return true
-		}
-	}
-	for _, za := range sb.ZenithAbilities {
-		if textContainsImperil(za.Effects, element) {
-			return true
-		}
-	}
-	return false
+	return walkSBTexts(sb, sbTextWalkOptions{}, func(text string) bool {
+		return textContainsImperil(text, element)
+	})
 }

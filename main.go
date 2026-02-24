@@ -13,7 +13,9 @@ func main() {
 	ensureCSVs()
 
 	log.Println("Loading data...")
-	reloadData()
+	if err := reloadData(); err != nil {
+		log.Fatalf("Initial data load failed: %v", err)
+	}
 
 	log.Println("Loading user data...")
 	initUserData()

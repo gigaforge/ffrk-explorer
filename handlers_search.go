@@ -7,174 +7,139 @@ import (
 	"strings"
 )
 
-func searchHandler(w http.ResponseWriter, r *http.Request) {
-	d := getAppDataSnapshot()
-	if d == nil {
-		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
-		return
-	}
-	charFilter := r.URL.Query().Get("character")
-	realmFilter := r.URL.Query().Get("realm")
-	tierFilter := r.URL.Query().Get("tier")
-	elementFilter := r.URL.Query().Get("element")
-	imperilFilter := r.URL.Query().Get("imperil")
-	effectsParam := r.URL.Query().Get("effects")
-	schoolsParam := r.URL.Query().Get("schools")
-	schoolModeParam := r.URL.Query().Get("schoolmode")
-	if schoolModeParam == "" {
-		schoolModeParam = "and"
-	}
-	ownedOnly := r.URL.Query().Get("owned") == "1"
+const maxSearchResults = 500
 
-	var additionalEffects []string
+type searchSchoolReq struct {
+	School   string
+	MinLevel int
+}
+
+type searchRequest struct {
+	Character         string
+	characterLower    string
+	Realm             string
+	Tier              string
+	Element           string
+	Imperil           string
+	SchoolsParam      string
+	SchoolMode        string
+	OwnedOnly         bool
+	AdditionalEffects []string
+	SchoolReqs        []searchSchoolReq
+	HasEffectFilter   bool
+	HasSBFilter       bool
+}
+
+func parseSearchRequest(r *http.Request) searchRequest {
+	q := r.URL.Query()
+	req := searchRequest{
+		Character:    q.Get("character"),
+		Realm:        q.Get("realm"),
+		Tier:         q.Get("tier"),
+		Element:      q.Get("element"),
+		Imperil:      q.Get("imperil"),
+		SchoolsParam: q.Get("schools"),
+		SchoolMode:   q.Get("schoolmode"),
+		OwnedOnly:    q.Get("owned") == "1",
+	}
+	if req.SchoolMode == "" {
+		req.SchoolMode = "and"
+	}
+	req.characterLower = strings.ToLower(req.Character)
+
+	effectsParam := q.Get("effects")
 	if effectsParam != "" {
 		for _, e := range strings.Split(effectsParam, ",") {
 			e = strings.TrimSpace(e)
 			if e != "" {
-				additionalEffects = append(additionalEffects, e)
+				req.AdditionalEffects = append(req.AdditionalEffects, e)
 			}
 		}
 	}
 
-	type schoolReq struct {
-		School   string
-		MinLevel int
-	}
-	var schoolReqs []schoolReq
-	if schoolsParam != "" {
-		for _, pair := range strings.Split(schoolsParam, ",") {
+	if req.SchoolsParam != "" {
+		for _, pair := range strings.Split(req.SchoolsParam, ",") {
 			parts := strings.SplitN(pair, ":", 2)
-			if len(parts) == 2 {
-				level, err := strconv.Atoi(parts[1])
-				if err == nil && level >= 1 && level <= 6 {
-					schoolReqs = append(schoolReqs, schoolReq{School: parts[0], MinLevel: level})
-				}
-			}
-		}
-	}
-
-	hasEffectFilter := elementFilter != "" || imperilFilter != "" || len(additionalEffects) > 0
-	hasSBFilter := tierFilter != "" || hasEffectFilter
-
-	// Get owned soulbreaks for filtering
-	u := getCurrentUser(r)
-	var ownedSet map[string]bool
-	if u != nil {
-		ownedSet = snapshotOwnedSoulbreaks(u.ID)
-	}
-	if ownedOnly && (u == nil || ownedSet == nil) {
-		ownedOnly = false
-	}
-
-	// Filter characters
-	var matchedChars []Character
-	for _, c := range d.Characters {
-		if charFilter != "" && !strings.Contains(strings.ToLower(c.Name), strings.ToLower(charFilter)) {
-			continue
-		}
-		if realmFilter != "" && c.Realm != realmFilter {
-			continue
-		}
-		if len(schoolReqs) > 0 {
-			match := schoolModeParam == "and"
-			for _, req := range schoolReqs {
-				has := c.Schools[req.School] >= req.MinLevel
-				if schoolModeParam == "and" {
-					if !has {
-						match = false
-						break
-					}
-				} else {
-					if has {
-						match = true
-						break
-					}
-				}
-			}
-			if !match {
+			if len(parts) != 2 {
 				continue
 			}
+			level, err := strconv.Atoi(parts[1])
+			if err != nil || level < 1 || level > 6 {
+				continue
+			}
+			req.SchoolReqs = append(req.SchoolReqs, searchSchoolReq{
+				School:   parts[0],
+				MinLevel: level,
+			})
 		}
-		matchedChars = append(matchedChars, c)
 	}
 
-	sort.Slice(matchedChars, func(i, j int) bool {
-		return matchedChars[i].Name < matchedChars[j].Name
-	})
+	req.HasEffectFilter = req.Element != "" || req.Imperil != "" || len(req.AdditionalEffects) > 0
+	req.HasSBFilter = req.Tier != "" || req.HasEffectFilter
+	return req
+}
 
+func filterSearchCharacters(d *AppData, req searchRequest) []Character {
+	var matched []Character
+	for _, c := range d.Characters {
+		if req.Character != "" && !strings.Contains(strings.ToLower(c.Name), req.characterLower) {
+			continue
+		}
+		if req.Realm != "" && c.Realm != req.Realm {
+			continue
+		}
+		if !characterMatchesSchoolReqs(c, req.SchoolReqs, req.SchoolMode) {
+			continue
+		}
+		matched = append(matched, c)
+	}
+
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].Name < matched[j].Name
+	})
+	return matched
+}
+
+func characterMatchesSchoolReqs(c Character, reqs []searchSchoolReq, mode string) bool {
+	if len(reqs) == 0 {
+		return true
+	}
+
+	match := mode == "and"
+	for _, req := range reqs {
+		has := c.Schools[req.School] >= req.MinLevel
+		if mode == "and" {
+			if !has {
+				match = false
+				break
+			}
+			continue
+		}
+		if has {
+			match = true
+			break
+		}
+	}
+	return match
+}
+
+func buildSearchResults(d *AppData, chars []Character, req searchRequest, ownedSet map[string]bool) ([]SearchResult, bool) {
 	var results []SearchResult
 	totalCount := 0
 	truncated := false
-	const maxResults = 500
 
-	for _, c := range matchedChars {
+	for _, c := range chars {
 		if truncated {
 			break
 		}
 
-		// Collect matching soul breaks
-		var matchedSBs []SoulBreak
-		for _, sb := range d.SoulBreaks[c.Name] {
-			if ownedOnly && !ownedSet[sb.ID] {
-				continue
-			}
-			if tierFilter != "" && sb.Tier != tierFilter {
-				continue
-			}
-			if elementFilter != "" && !sbMatchesElement(sb, elementFilter) {
-				continue
-			}
-			if imperilFilter != "" && !sbMatchesImperil(sb, imperilFilter) {
-				continue
-			}
-			if len(additionalEffects) > 0 && !sbMatchesAdditionalEffects(sb, additionalEffects) {
-				continue
-			}
-			matchedSBs = append(matchedSBs, sb)
-			totalCount++
-			if totalCount >= maxResults {
-				truncated = true
-				break
-			}
-		}
+		matchedSBs, nextCount, sbTruncated := collectMatchingSoulBreaks(d, c, req, ownedSet, totalCount)
+		totalCount = nextCount
+		truncated = sbTruncated
 
-		// Collect hero abilities:
-		// - No SB filters: include all HAs for the character
-		// - SB filters active: only include HAs that match effect filters,
-		//   and only if the character also has matching soul breaks
-		var matchedHAs []HeroAbility
-		if !truncated && !hasSBFilter {
-			for _, ha := range d.HeroAbilities[c.Name] {
-				matchedHAs = append(matchedHAs, ha)
-				totalCount++
-				if totalCount >= maxResults {
-					truncated = true
-					break
-				}
-			}
-		} else if !truncated && len(matchedSBs) > 0 && hasEffectFilter {
-			for _, ha := range d.HeroAbilities[c.Name] {
-				match := false
-				if elementFilter != "" && textContainsAttach(ha.Effects, elementFilter) {
-					match = true
-				}
-				if imperilFilter != "" && textContainsImperil(ha.Effects, imperilFilter) {
-					match = true
-				}
-				if len(additionalEffects) > 0 && haMatchesAdditionalEffects(ha, additionalEffects) {
-					match = true
-				}
-				if !match {
-					continue
-				}
-				matchedHAs = append(matchedHAs, ha)
-				totalCount++
-				if totalCount >= maxResults {
-					truncated = true
-					break
-				}
-			}
-		}
+		matchedHAs, nextCount, haTruncated := collectMatchingHeroAbilities(d, c, req, matchedSBs, totalCount, truncated)
+		totalCount = nextCount
+		truncated = haTruncated
 
 		if len(matchedSBs) > 0 || len(matchedHAs) > 0 {
 			results = append(results, SearchResult{
@@ -185,18 +150,105 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	return results, truncated
+}
+
+func collectMatchingSoulBreaks(d *AppData, c Character, req searchRequest, ownedSet map[string]bool, totalCount int) ([]SoulBreak, int, bool) {
+	var matchedSBs []SoulBreak
+	truncated := false
+
+	for _, sb := range d.SoulBreaks[c.Name] {
+		if req.OwnedOnly && !ownedSet[sb.ID] {
+			continue
+		}
+		if req.Tier != "" && sb.Tier != req.Tier {
+			continue
+		}
+		if req.Element != "" && !sbMatchesElement(sb, req.Element) {
+			continue
+		}
+		if req.Imperil != "" && !sbMatchesImperil(sb, req.Imperil) {
+			continue
+		}
+		if len(req.AdditionalEffects) > 0 && !sbMatchesAdditionalEffects(sb, req.AdditionalEffects) {
+			continue
+		}
+
+		matchedSBs = append(matchedSBs, sb)
+		totalCount++
+		if totalCount >= maxSearchResults {
+			truncated = true
+			break
+		}
+	}
+
+	return matchedSBs, totalCount, truncated
+}
+
+func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, matchedSBs []SoulBreak, totalCount int, alreadyTruncated bool) ([]HeroAbility, int, bool) {
+	if alreadyTruncated {
+		return nil, totalCount, true
+	}
+
+	var matchedHAs []HeroAbility
+	truncated := false
+
+	if !req.HasSBFilter {
+		for _, ha := range d.HeroAbilities[c.Name] {
+			matchedHAs = append(matchedHAs, ha)
+			totalCount++
+			if totalCount >= maxSearchResults {
+				truncated = true
+				break
+			}
+		}
+		return matchedHAs, totalCount, truncated
+	}
+
+	if len(matchedSBs) == 0 || !req.HasEffectFilter {
+		return nil, totalCount, false
+	}
+
+	for _, ha := range d.HeroAbilities[c.Name] {
+		match := false
+		if req.Element != "" && textContainsAttach(ha.Effects, req.Element) {
+			match = true
+		}
+		if req.Imperil != "" && textContainsImperil(ha.Effects, req.Imperil) {
+			match = true
+		}
+		if len(req.AdditionalEffects) > 0 && haMatchesAdditionalEffects(ha, req.AdditionalEffects) {
+			match = true
+		}
+		if !match {
+			continue
+		}
+
+		matchedHAs = append(matchedHAs, ha)
+		totalCount++
+		if totalCount >= maxSearchResults {
+			truncated = true
+			break
+		}
+	}
+
+	return matchedHAs, totalCount, truncated
+}
+
+func buildSearchData(req searchRequest, results []SearchResult, truncated bool, u *User, ownedSet map[string]bool) SearchData {
 	data := SearchData{
 		Results:    results,
 		Truncated:  truncated,
-		MaxResults: maxResults,
+		MaxResults: maxSearchResults,
 	}
-	data.Query.Character = charFilter
-	data.Query.Realm = realmFilter
-	data.Query.Tier = tierFilter
-	data.Query.Element = elementFilter
-	data.Query.Imperil = imperilFilter
-	data.Query.Schools = schoolsParam
-	data.Query.SchoolMode = schoolModeParam
+
+	data.Query.Character = req.Character
+	data.Query.Realm = req.Realm
+	data.Query.Tier = req.Tier
+	data.Query.Element = req.Element
+	data.Query.Imperil = req.Imperil
+	data.Query.Schools = req.SchoolsParam
+	data.Query.SchoolMode = req.SchoolMode
 
 	if u != nil {
 		data.LoggedIn = true
@@ -208,13 +260,36 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		data.OwnedSoulbreaks = make(map[string]bool)
 	}
 
+	return data
+}
+
+func searchHandler(w http.ResponseWriter, r *http.Request) {
+	d, ok := requireAppData(w)
+	if !ok {
+		return
+	}
+
+	req := parseSearchRequest(r)
+
+	u := getCurrentUser(r)
+	var ownedSet map[string]bool
+	if u != nil {
+		ownedSet = snapshotOwnedSoulbreaks(u.ID)
+	}
+	if req.OwnedOnly && (u == nil || ownedSet == nil) {
+		req.OwnedOnly = false
+	}
+
+	matchedChars := filterSearchCharacters(d, req)
+	results, truncated := buildSearchResults(d, matchedChars, req, ownedSet)
+	data := buildSearchData(req, results, truncated, u, ownedSet)
+
 	searchTmpl.Execute(w, data)
 }
 
 func charHandler(w http.ResponseWriter, r *http.Request) {
-	d := getAppDataSnapshot()
-	if d == nil {
-		http.Error(w, "data not loaded", http.StatusServiceUnavailable)
+	d, ok := requireAppData(w)
+	if !ok {
 		return
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/char/")

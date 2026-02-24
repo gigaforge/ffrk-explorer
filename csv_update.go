@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -16,6 +17,10 @@ const csvDir = "data"
 
 func csvPath(name string) string {
 	return filepath.Join(csvDir, name)
+}
+
+func sheetCSVURL(sheet csvSheet) string {
+	return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
 }
 
 func downloadCSV(url string) ([]byte, error) {
@@ -82,6 +87,58 @@ func countCSVRows(filename string) int {
 	return len(records) - 1
 }
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+func buildStagedAppData(updates map[string][]byte) (*AppData, error) {
+	stageDir, err := os.MkdirTemp(csvDir, ".csv-stage-*")
+	if err != nil {
+		return nil, fmt.Errorf("create staging dir: %w", err)
+	}
+	defer os.RemoveAll(stageDir)
+
+	entries, err := os.ReadDir(csvDir)
+	if err != nil {
+		return nil, fmt.Errorf("read csv dir: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".csv") {
+			continue
+		}
+		src := csvPath(entry.Name())
+		dst := filepath.Join(stageDir, entry.Name())
+		if err := copyFile(src, dst); err != nil {
+			return nil, fmt.Errorf("copy %s to stage: %w", entry.Name(), err)
+		}
+	}
+	for name, data := range updates {
+		if err := os.WriteFile(filepath.Join(stageDir, name), data, 0o644); err != nil {
+			return nil, fmt.Errorf("write staged %s: %w", name, err)
+		}
+	}
+
+	next, err := buildAppDataFromCSVDir(stageDir)
+	if err != nil {
+		return nil, fmt.Errorf("staged data build failed: %w", err)
+	}
+	return next, nil
+}
+
 func ensureCSVs() {
 	if err := os.MkdirAll(csvDir, 0o755); err != nil {
 		log.Fatalf("Failed to create data directory %s: %v", csvDir, err)
@@ -92,7 +149,7 @@ func ensureCSVs() {
 			continue
 		}
 		log.Printf("Missing %s, downloading...", sheet.Filename)
-		url := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
+		url := sheetCSVURL(sheet)
 		data, err := downloadCSV(url)
 		if err != nil {
 			log.Fatalf("Failed to download %s: %v", sheet.Filename, err)
@@ -108,9 +165,9 @@ func ensureCSVs() {
 }
 
 func updateCSVs() {
-	anyUpdated := false
+	updates := make(map[string][]byte)
 	for _, sheet := range csvSheets {
-		url := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
+		url := sheetCSVURL(sheet)
 		data, err := downloadCSV(url)
 		if err != nil {
 			log.Printf("WARNING: failed to download %s: %v", sheet.Filename, err)
@@ -121,22 +178,52 @@ func updateCSVs() {
 			log.Printf("WARNING: validation failed for %s: %v", sheet.Filename, err)
 			continue
 		}
+
+		targetFile := csvPath(sheet.Filename)
+		currentData, err := os.ReadFile(targetFile)
+		if err == nil && bytes.Equal(currentData, data) {
+			continue
+		}
+		if err != nil && !os.IsNotExist(err) {
+			log.Printf("WARNING: failed to read %s for change detection: %v", targetFile, err)
+			continue
+		}
+
+		updates[sheet.Filename] = data
+	}
+
+	if len(updates) == 0 {
+		return
+	}
+
+	log.Printf("Validating staged CSV update set (%d changed files)...", len(updates))
+	next, err := buildStagedAppData(updates)
+	if err != nil {
+		log.Printf("WARNING: staged CSV validation failed; keeping existing CSV files and in-memory data: %v", err)
+		return
+	}
+
+	for _, sheet := range csvSheets {
+		data, ok := updates[sheet.Filename]
+		if !ok {
+			continue
+		}
 		targetFile := csvPath(sheet.Filename)
 		tmpFile := targetFile + ".tmp"
 		if err := os.WriteFile(tmpFile, data, 0o644); err != nil {
 			log.Printf("WARNING: failed to write %s: %v", tmpFile, err)
-			continue
+			return
 		}
 		if err := os.Rename(tmpFile, targetFile); err != nil {
 			log.Printf("WARNING: failed to rename %s to %s: %v", tmpFile, targetFile, err)
-			continue
+			return
 		}
 		log.Printf("Updated %s (%d bytes)", sheet.Filename, len(data))
-		anyUpdated = true
 	}
-	if anyUpdated {
-		log.Println("Reloading data after CSV update...")
-		reloadData()
-		log.Println("Data reload complete.")
-	}
+
+	dataLock.Lock()
+	appData = next
+	dataLock.Unlock()
+	log.Printf("Reloaded %d characters", len(next.Characters))
+	log.Println("Data reload complete.")
 }

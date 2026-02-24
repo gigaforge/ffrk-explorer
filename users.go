@@ -269,8 +269,7 @@ func getCurrentUser(r *http.Request) *User {
 // ---------- auth API handlers ----------
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 	var req struct {
@@ -284,9 +283,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	req.Username = strings.TrimSpace(req.Username)
 	req.Password = strings.TrimSpace(req.Password)
 	if req.Username == "" || req.Password == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Username and password are required"})
+		jsonError(w, http.StatusUnauthorized, "Username and password are required")
 		return
 	}
 
@@ -294,9 +291,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	u := usersByName[strings.ToLower(req.Username)]
 	userLock.RUnlock()
 	if u == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		jsonError(w, http.StatusUnauthorized, "Invalid username or password")
 		return
 	}
 
@@ -304,20 +299,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// PHP uses $2y$ prefix; Go's bcrypt accepts $2a$ — replace prefix for compat
 	storedHash := strings.Replace(u.PasswordHash, "$2y$", "$2a$", 1)
 	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(sha256Hex)); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid username or password"})
+		jsonError(w, http.StatusUnauthorized, "Invalid username or password")
 		return
 	}
 
 	createSession(w, u.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 	var req struct {
@@ -331,24 +322,18 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	req.Username = strings.TrimSpace(req.Username)
 	req.Password = strings.TrimSpace(req.Password)
 	if req.Username == "" || len(req.Password) < 6 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Username required, password must be at least 6 characters"})
+		jsonError(w, http.StatusBadRequest, "Username required, password must be at least 6 characters")
 		return
 	}
 	if len(req.Username) > 50 {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Username too long (max 50 characters)"})
+		jsonError(w, http.StatusBadRequest, "Username too long (max 50 characters)")
 		return
 	}
 
 	userLock.Lock()
 	if _, exists := usersByName[strings.ToLower(req.Username)]; exists {
 		userLock.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Username already taken"})
+		jsonError(w, http.StatusConflict, "Username already taken")
 		return
 	}
 
@@ -375,13 +360,11 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	saveUsersJSON("data/users.json")
 	createSession(w, u.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 	cookie, err := r.Cookie("session")
@@ -399,28 +382,22 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
 func meHandler(w http.ResponseWriter, r *http.Request) {
 	u := getCurrentUser(r)
 	if u == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		jsonError(w, http.StatusUnauthorized, "not logged in")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
 }
 
 func userSoulbreaksGetHandler(w http.ResponseWriter, r *http.Request) {
 	u := getCurrentUser(r)
 	if u == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		jsonError(w, http.StatusUnauthorized, "not logged in")
 		return
 	}
 	userLock.RLock()
@@ -431,16 +408,13 @@ func userSoulbreaksGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	userLock.RUnlock()
 	sort.Strings(ids)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ids)
+	writeJSON(w, http.StatusOK, ids)
 }
 
 func userSoulbreaksPostHandler(w http.ResponseWriter, r *http.Request) {
 	u := getCurrentUser(r)
 	if u == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "not logged in"})
+		jsonError(w, http.StatusUnauthorized, "not logged in")
 		return
 	}
 	var req struct {
@@ -468,8 +442,7 @@ func userSoulbreaksPostHandler(w http.ResponseWriter, r *http.Request) {
 	userLock.Unlock()
 
 	saveUserSoulbreaksForUser(u.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
 }
 
 func userSoulbreaksHandler(w http.ResponseWriter, r *http.Request) {

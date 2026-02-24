@@ -128,6 +128,7 @@ type CharDetail struct {
 }
 
 type AppData struct {
+	csvDir           string
 	Characters       []Character
 	SoulBreaks       map[string][]SoulBreak
 	HeroAbilities    map[string][]HeroAbility
