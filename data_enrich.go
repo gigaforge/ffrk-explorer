@@ -21,6 +21,7 @@ type statusTextMatch struct {
 	start int
 	end   int
 	se    StatusEffect
+	wrap  bool
 }
 
 func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
@@ -101,15 +102,64 @@ func boundaryOK(text string, start, end int) bool {
 	return true
 }
 
-// matchEffectsInText extracts bracketed status effects from text, inferring
-// duration from the next "for N seconds" that follows each bracket when the
-// status has no default duration.
-func (d *AppData) matchEffectsInText(text string) []StatusEffect {
+func dedupeStatusEffects(matches []statusTextMatch) []StatusEffect {
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]bool, len(matches))
+	out := make([]StatusEffect, 0, len(matches))
+	for _, m := range matches {
+		if seen[m.se.Name] {
+			continue
+		}
+		seen[m.se.Name] = true
+		out = append(out, m.se)
+	}
+	return out
+}
+
+func wrapMatchedEffectText(text string, matches []statusTextMatch) string {
+	if len(matches) == 0 || len(text) == 0 {
+		return text
+	}
+	var wraps []statusTextMatch
+	for _, m := range matches {
+		if m.wrap {
+			wraps = append(wraps, m)
+		}
+	}
+	if len(wraps) == 0 {
+		return text
+	}
+
+	var b strings.Builder
+	// Each wrapped span adds 2 chars.
+	b.Grow(len(text) + len(wraps)*2)
+	prev := 0
+	for _, m := range wraps {
+		if m.start < prev || m.end > len(text) || m.start >= m.end {
+			continue
+		}
+		b.WriteString(text[prev:m.start])
+		b.WriteByte('[')
+		b.WriteString(text[m.start:m.end])
+		b.WriteByte(']')
+		prev = m.end
+	}
+	b.WriteString(text[prev:])
+	return b.String()
+}
+
+// matchAndBracketEffectsInText extracts status effects from text, inferring
+// duration from the next "for N seconds" that follows each match when the
+// status has no default duration. It preserves existing brackets and adds
+// brackets to newly full-text-matched effects outside bracketed regions.
+func (d *AppData) matchAndBracketEffectsInText(text string) (string, []StatusEffect) {
 	bracketLocs := bracketRe.FindAllStringSubmatchIndex(text, -1)
 	durLocs := forSecRe.FindAllStringSubmatchIndex(text, -1)
 	occupied := make([]bool, len(text))
 
-	var results []StatusEffect
+	var matches []statusTextMatch
 	for _, bloc := range bracketLocs {
 		markOccupied(occupied, bloc[0], bloc[1]) // skip full-text matching inside already-bracketed text
 		term := text[bloc[2]:bloc[3]]
@@ -118,14 +168,26 @@ func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 			continue
 		}
 		se = fillStatusDurationFromFollowing(text, bloc[1], durLocs, se)
-		results = append(results, se)
+		matches = append(matches, statusTextMatch{
+			start: bloc[0],
+			end:   bloc[1],
+			se:    se,
+		})
 	}
 
 	if len(d.statusMatchTerms) == 0 || len(text) == 0 {
-		return results
+		sort.Slice(matches, func(i, j int) bool {
+			if matches[i].start != matches[j].start {
+				return matches[i].start < matches[j].start
+			}
+			if matches[i].end != matches[j].end {
+				return matches[i].end < matches[j].end
+			}
+			return matches[i].se.Name < matches[j].se.Name
+		})
+		return text, dedupeStatusEffects(matches)
 	}
 
-	var textMatches []statusTextMatch
 	for _, term := range d.statusMatchTerms {
 		if term == "" {
 			continue
@@ -141,10 +203,11 @@ func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 				se, ok := d.lookupStatus(term)
 				if ok {
 					se = fillStatusDurationFromFollowing(text, end, durLocs, se)
-					textMatches = append(textMatches, statusTextMatch{
+					matches = append(matches, statusTextMatch{
 						start: start,
 						end:   end,
 						se:    se,
+						wrap:  true,
 					})
 					markOccupied(occupied, start, end)
 				}
@@ -153,19 +216,23 @@ func (d *AppData) matchEffectsInText(text string) []StatusEffect {
 		}
 	}
 
-	sort.Slice(textMatches, func(i, j int) bool {
-		if textMatches[i].start != textMatches[j].start {
-			return textMatches[i].start < textMatches[j].start
+	sort.Slice(matches, func(i, j int) bool {
+		if matches[i].start != matches[j].start {
+			return matches[i].start < matches[j].start
 		}
-		if textMatches[i].end != textMatches[j].end {
-			return textMatches[i].end < textMatches[j].end
+		if matches[i].end != matches[j].end {
+			return matches[i].end < matches[j].end
 		}
-		return textMatches[i].se.Name < textMatches[j].se.Name
+		return matches[i].se.Name < matches[j].se.Name
 	})
-	for _, m := range textMatches {
-		results = append(results, m.se)
-	}
-	return results
+	return wrapMatchedEffectText(text, matches), dedupeStatusEffects(matches)
+}
+
+// matchEffectsInText extracts status effects from text and returns a deduped
+// list for expanded status breakdowns.
+func (d *AppData) matchEffectsInText(text string) []StatusEffect {
+	_, matched := d.matchAndBracketEffectsInText(text)
+	return matched
 }
 
 func (d *AppData) rewriteSoulBreakLists(rewrite func([]SoulBreak) []SoulBreak) {
@@ -190,7 +257,7 @@ func filterSoulBreaksByRemovedIndex(sbList []SoulBreak, remove map[int]bool) []S
 func (d *AppData) matchSoulBreakEffects() {
 	d.rewriteSoulBreakLists(func(sbList []SoulBreak) []SoulBreak {
 		for i := range sbList {
-			sbList[i].MatchedEffects = d.matchEffectsInText(sbList[i].Effects)
+			sbList[i].Effects, sbList[i].MatchedEffects = d.matchAndBracketEffectsInText(sbList[i].Effects)
 		}
 		return sbList
 	})

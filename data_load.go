@@ -291,11 +291,19 @@ func sbGroupKey(character, source string) string {
 	return character + "|" + source
 }
 
-func cloneWithMatchedEffects[T any](d *AppData, src []T, effects func(T) string, setMatched func(*T, []StatusEffect)) []T {
+func cloneWithMatchedEffects[T any](
+	d *AppData,
+	src []T,
+	effects func(T) string,
+	setEffects func(*T, string),
+	setMatched func(*T, []StatusEffect),
+) []T {
 	matched := make([]T, len(src))
 	copy(matched, src)
 	for i := range matched {
-		setMatched(&matched[i], d.matchEffectsInText(effects(matched[i])))
+		text, statuses := d.matchAndBracketEffectsInText(effects(matched[i]))
+		setEffects(&matched[i], text)
+		setMatched(&matched[i], statuses)
 	}
 	return matched
 }
@@ -305,6 +313,7 @@ func attachTieredChildSlice[T any](
 	tier string,
 	groups map[string][]T,
 	effects func(T) string,
+	setEffects func(*T, string),
 	setMatched func(*T, []StatusEffect),
 	assign func(*SoulBreak, []T),
 ) {
@@ -316,7 +325,7 @@ func attachTieredChildSlice[T any](
 			}
 			key := sbGroupKey(sb.Character, sb.Name)
 			if children, ok := groups[key]; ok {
-				assign(sb, cloneWithMatchedEffects(d, children, effects, setMatched))
+				assign(sb, cloneWithMatchedEffects(d, children, effects, setEffects, setMatched))
 			}
 		}
 		d.SoulBreaks[name] = sbList
@@ -331,7 +340,7 @@ func (d *AppData) cloneMatchedBraveCommand(src *BraveCommand) *BraveCommand {
 	matched.Levels = make([]BraveLevel, len(src.Levels))
 	copy(matched.Levels, src.Levels)
 	for i := range matched.Levels {
-		matched.Levels[i].MatchedEffects = d.matchEffectsInText(matched.Levels[i].Effects)
+		matched.Levels[i].Effects, matched.Levels[i].MatchedEffects = d.matchAndBracketEffectsInText(matched.Levels[i].Effects)
 	}
 	return &matched
 }
@@ -373,6 +382,7 @@ func (d *AppData) matchBurstCommands() {
 		"BSB",
 		d.BurstCommands,
 		func(bc BurstCommand) string { return bc.Effects },
+		func(bc *BurstCommand, effects string) { bc.Effects = effects },
 		func(bc *BurstCommand, matched []StatusEffect) { bc.MatchedEffects = matched },
 		func(sb *SoulBreak, matched []BurstCommand) { sb.BurstCommands = matched },
 	)
@@ -417,6 +427,7 @@ func (d *AppData) matchSynchroAbilities() {
 		"SASB",
 		d.SynchroAbilities,
 		func(sa SynchroAbility) string { return sa.Effects },
+		func(sa *SynchroAbility, effects string) { sa.Effects = effects },
 		func(sa *SynchroAbility, matched []StatusEffect) { sa.MatchedEffects = matched },
 		func(sb *SoulBreak, matched []SynchroAbility) { sb.SynchroAbilities = matched },
 	)
@@ -452,6 +463,7 @@ func (d *AppData) matchZenithAbilities() {
 		"ZSB",
 		d.ZenithAbilities,
 		func(za ZenithAbility) string { return za.Effects },
+		func(za *ZenithAbility, effects string) { za.Effects = effects },
 		func(za *ZenithAbility, matched []StatusEffect) { za.MatchedEffects = matched },
 		func(sb *SoulBreak, matched []ZenithAbility) { sb.ZenithAbilities = matched },
 	)
