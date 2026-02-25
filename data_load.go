@@ -245,17 +245,22 @@ func (d *AppData) loadSoulBreaks() error {
 		return err
 	}
 	for _, row := range rows {
+		mult := row["Multiplier"]
+		if mult == "" {
+			mult = "-"
+		}
 		sb := SoulBreak{
-			Character: row["Character"],
-			Img:       row["Img"],
-			Name:      row["Name"],
-			Tier:      row["Tier"],
-			SBVer:     row["SB Ver"],
-			Type:      row["Type"],
-			Element:   row["Element"],
-			Time:      row["Time"],
-			Effects:   row["Effects"],
-			ID:        row["ID"],
+			Character:  row["Character"],
+			Img:        row["Img"],
+			Name:       row["Name"],
+			Tier:       row["Tier"],
+			SBVer:      row["SB Ver"],
+			Type:       row["Type"],
+			Multiplier: mult,
+			Element:    row["Element"],
+			Time:       row["Time"],
+			Effects:    row["Effects"],
+			ID:         row["ID"],
 		}
 		d.SoulBreaks[sb.Character] = append(d.SoulBreaks[sb.Character], sb)
 		if isValidTier(sb.Tier) {

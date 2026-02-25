@@ -98,6 +98,7 @@ type SoulBreak struct {
 	Tier             string
 	SBVer            string
 	Type             string
+	Multiplier       string
 	Element          string
 	Time             string
 	Effects          string
