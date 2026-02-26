@@ -215,17 +215,13 @@ func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, ma
 	}
 
 	for _, ha := range d.HeroAbilities[c.Name] {
-		match := false
-		if req.Element != "" && textContainsAttach(ha.Effects, req.Element) {
-			match = true
+		if req.Element != "" && !textContainsAttach(ha.Effects, req.Element) {
+			continue
 		}
-		if req.Imperil != "" && textContainsImperil(ha.Effects, req.Imperil) {
-			match = true
+		if req.Imperil != "" && !textContainsImperil(ha.Effects, req.Imperil) {
+			continue
 		}
-		if len(req.AdditionalEffects) > 0 && haMatchesAdditionalEffects(ha, req.AdditionalEffects) {
-			match = true
-		}
-		if !match {
+		if len(req.AdditionalEffects) > 0 && !haMatchesAdditionalEffects(ha, req.AdditionalEffects) {
 			continue
 		}
 
@@ -279,17 +275,13 @@ func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, ow
 		if req.OwnedOnly && isLMRTier(lm.Tier) && !ownedSet[lm.ID] {
 			continue
 		}
-		match := false
-		if req.Element != "" && textContainsAttach(lm.Effect, req.Element) {
-			match = true
+		if req.Element != "" && !textContainsAttach(lm.Effect, req.Element) {
+			continue
 		}
-		if req.Imperil != "" && textContainsImperil(lm.Effect, req.Imperil) {
-			match = true
+		if req.Imperil != "" && !textContainsImperil(lm.Effect, req.Imperil) {
+			continue
 		}
-		if len(req.AdditionalEffects) > 0 && lmMatchesAdditionalEffects(lm, req.AdditionalEffects) {
-			match = true
-		}
-		if !match {
+		if len(req.AdditionalEffects) > 0 && !lmMatchesAdditionalEffects(lm, req.AdditionalEffects) {
 			continue
 		}
 
