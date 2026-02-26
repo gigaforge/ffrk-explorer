@@ -252,6 +252,10 @@ func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, ow
 	var matchedLMs []LegendMateria
 	truncated := false
 
+	if req.Tier != "" {
+		return nil, totalCount, false
+	}
+
 	if !req.HasSBFilter {
 		for _, lm := range d.LegendMateria[c.Name] {
 			if req.OwnedOnly && isLMRTier(lm.Tier) && !ownedSet[lm.ID] {
