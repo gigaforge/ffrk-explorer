@@ -115,8 +115,10 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
   tr.sb-detail td[colspan] { width: 100%; }
 
   /* Burst/nested tables */
-  .burst-table { font-size: 13px; }
-  .burst-table thead tr { display: none; }
+  .burst-table { font-size: 13px; width: 100%; }
+  .burst-table thead tr,
+  .burst-table > tr:first-child,
+  .burst-table > tbody > tr:first-child { display: none; }
   .burst-table { border-collapse: separate; border-spacing: 0 6px; }
   tr.bc-row {
     display: flex; flex-wrap: wrap; align-items: center;
@@ -125,6 +127,17 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
   }
   tr.bc-row > td { border-bottom: none; padding: 2px; background: transparent; }
   tr.bc-row td.bc-chevron { order: 0; width: auto; }
+  /* Icon cells */
+  tr.bc-row > td:has(.burst-icon),
+  tr.bc-row > td:has(.brave-icon-wrap) { order: 1; }
+  .burst-icon { width: 32px; height: 32px; }
+  .brave-icon-wrap { transform: scale(0.7); }
+  /* Middle metadata cells as compact tags */
+  tr.bc-row > td:not(.bc-chevron):not(:last-child):not(:has(.burst-icon)):not(:has(.brave-icon-wrap)) {
+    order: 3; font-size: 12px; color: #aaa;
+    background: #1a1a2e; border-radius: 3px; padding: 2px 6px !important;
+  }
+  /* Effects - full width on second line */
   tr.bc-row td:last-child { order: 5; flex-basis: 100%; font-size: 13px; }
   .burst-table td.effects, .burst-table td:has(.effects),
   tr.bc-row td .effects { max-width: none; }
