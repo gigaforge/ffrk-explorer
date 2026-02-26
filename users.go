@@ -304,7 +304,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createSession(w, u.ID)
-	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username, "api_key": u.APIKey})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -360,7 +360,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	saveUsersJSON("data/users.json")
 	createSession(w, u.ID)
-	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username, "api_key": u.APIKey})
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -391,7 +391,7 @@ func meHandler(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnauthorized, "not logged in")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username})
+	writeJSON(w, http.StatusOK, map[string]string{"username": u.Username, "api_key": u.APIKey})
 }
 
 func userSoulbreaksGetHandler(w http.ResponseWriter, r *http.Request) {

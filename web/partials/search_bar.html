@@ -253,29 +253,49 @@ document.getElementById('register-password').addEventListener('keydown',function
 function closeAuthModals(){document.getElementById('login-modal').classList.remove('visible');document.getElementById('register-modal').classList.remove('visible')}
 function showLogin(){document.getElementById('login-error').style.display='none';document.getElementById('login-modal').classList.add('visible');document.getElementById('login-username').focus()}
 function showRegister(){document.getElementById('register-error').style.display='none';document.getElementById('register-modal').classList.add('visible');document.getElementById('register-username').focus()}
-function renderAuth(username){
+function renderAuth(username,apiKey){
   var area=document.getElementById('auth-area');
-  if(username){area.innerHTML='<span class="welcome">Welcome, '+username+'</span><button onclick="doLogout()">Logout</button>';document.getElementById('owned-filter').style.display=''}
-  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false}
+  if(username){
+    var html='<span class="welcome">Welcome, '+username+'</span>';
+    if(apiKey){
+      html+='<div class="api-key-wrapper"><button class="api-key-btn" onclick="toggleApiKey(this)">Show API Key</button>';
+      html+='<div class="api-key-tooltip" id="api-key-tooltip">';
+      html+='<div class="api-key-value" id="api-key-value">'+apiKey+'</div>';
+      html+='<div class="api-key-tip">You can also use <a href="https://github.com/gigaforge/FFRK-LabMem-SBTracker" target="_blank" rel="noopener">FFRK-LabMem-SBTracker</a> to automatically synchronize the Soulbreaks on your account with this site for easy searching. Add your API key (visible when logged in) to the FFRK-LabMem-SBTracker general settings (hit \'C\' on LabMem to access the settings). Once done, loading the \'Party\' menu in FFRK for the first time after opening the game should cause it to synchronize your Soulbreaks.</div>';
+      html+='</div></div>';
+    }
+    html+='<button onclick="doLogout()">Logout</button>';
+    area.innerHTML=html;window.__apiKey=apiKey;document.getElementById('owned-filter').style.display='';
+  }
+  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false;window.__apiKey=null}
 }
+function toggleApiKey(btn){
+  var tooltip=document.getElementById('api-key-tooltip');
+  if(tooltip.classList.contains('visible')){tooltip.classList.remove('visible')}
+  else{tooltip.classList.add('visible')}
+}
+document.addEventListener('click',function(e){
+  var tooltip=document.getElementById('api-key-tooltip');
+  if(tooltip&&tooltip.classList.contains('visible')&&!e.target.closest('.api-key-wrapper')){tooltip.classList.remove('visible')}
+});
 function doLogin(){
   var u=document.getElementById('login-username').value,p=document.getElementById('login-password').value;
   fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
   .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
-  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username,res.data.api_key);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
     else{var e=document.getElementById('login-error');e.textContent=res.data.error||'Login failed';e.style.display='block'}});
 }
 function doRegister(){
   var u=document.getElementById('register-username').value,p=document.getElementById('register-password').value;
   fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
   .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d}})})
-  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
+  .then(function(res){if(res.ok){closeAuthModals();renderAuth(res.data.username,res.data.api_key);window.__currentUser=res.data.username;if(typeof onAuthChange==='function')onAuthChange()}
     else{var e=document.getElementById('register-error');e.textContent=res.data.error||'Registration failed';e.style.display='block'}});
 }
 function doLogout(){
   fetch('/api/logout',{method:'POST'}).then(function(){renderAuth(null);window.__currentUser=null;if(typeof onAuthChange==='function')onAuthChange()});
 }
-fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(function(d){if(d&&d.username){renderAuth(d.username);window.__currentUser=d.username}else{renderAuth(null)}});
+fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(function(d){if(d&&d.username){renderAuth(d.username,d.api_key);window.__currentUser=d.username}else{renderAuth(null)}});
 (function(){
   var p=new URLSearchParams(window.location.search);
   if(p.get('character'))document.getElementById('char-input').value=p.get('character');
