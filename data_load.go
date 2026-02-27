@@ -243,9 +243,10 @@ func (d *AppData) classifyDamageTypes() {
 			if level < 5 {
 				continue
 			}
-			if school == "Sharpshooter" || school == "Celerity" {
-				// Sharpshooter/Celerity only count as PHY if ATK > MAG
-				if c.ATK > c.MAG {
+			if school == "Sharpshooter" || school == "Celerity" || school == "Monk" || school == "Spellblade" {
+				// These schools only count as PHY for true physical or hybrid characters:
+				// ATK must be at least 300 and MAG must be within 20% of ATK.
+				if c.ATK >= 300 && c.MAG <= c.ATK*12/10 {
 					hasPHY = true
 				}
 			} else if phySchools[school] {
