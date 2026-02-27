@@ -243,8 +243,8 @@ func (d *AppData) classifyDamageTypes() {
 			if level < 5 {
 				continue
 			}
-			if school == "Sharpshooter" {
-				// Sharpshooter only counts as PHY if ATK > MAG
+			if school == "Sharpshooter" || school == "Celerity" {
+				// Sharpshooter/Celerity only count as PHY if ATK > MAG
 				if c.ATK > c.MAG {
 					hasPHY = true
 				}
