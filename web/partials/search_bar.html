@@ -14,6 +14,13 @@
     <option>XIII</option><option>XIV</option><option>XV</option><option>XVI</option>
     <option>FFT</option><option>Type-0</option><option>KH</option><option>Beyond</option><option>Core</option>
   </select>
+  <label>Type</label>
+  <select id="type-select">
+    <option value="">Any</option>
+    <option value="PHY">Physical</option>
+    <option value="MAG">Magical</option>
+    <option value="MND">Mind</option>
+  </select>
   <label>SB Tier</label>
   <select id="tier-select">
     <option value="">Any</option>
@@ -236,6 +243,7 @@ function doSearch(){
   var p=new URLSearchParams();
   var c=document.getElementById('char-input').value;if(c)p.set('character',c);
   var r=document.getElementById('realm-select').value;if(r)p.set('realm',r);
+  var ty=document.getElementById('type-select').value;if(ty)p.set('type',ty);
   var t=document.getElementById('tier-select').value;if(t)p.set('tier',t);
   var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
   var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
@@ -300,6 +308,7 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
   var p=new URLSearchParams(window.location.search);
   if(p.get('character'))document.getElementById('char-input').value=p.get('character');
   if(p.get('realm'))document.getElementById('realm-select').value=p.get('realm');
+  if(p.get('type'))document.getElementById('type-select').value=p.get('type');
   if(p.get('element'))document.getElementById('en-element-select').value=p.get('element');
   if(p.get('imperil'))document.getElementById('imperil-select').value=p.get('imperil');
   if(p.get('effects')){

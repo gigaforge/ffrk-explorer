@@ -3,11 +3,12 @@ package main
 // ---------- data types ----------
 
 type Character struct {
-	Realm   string
-	Name    string
-	Img     string
-	ID      string
-	Schools map[string]int // school name -> max rarity (1-6)
+	Realm      string
+	Name       string
+	Img        string
+	ID         string
+	Schools    map[string]int // school name -> max rarity (1-6)
+	DamageType string         // "PHY", "MAG", "MND", or combinations like "PHY/MAG"
 }
 
 type StatusEffect struct {
@@ -203,6 +204,7 @@ type SearchData struct {
 	Query           struct {
 		Character  string
 		Realm      string
+		DamageType string
 		Tier       string
 		Element    string
 		Imperil    string

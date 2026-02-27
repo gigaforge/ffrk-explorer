@@ -39,6 +39,7 @@ func buildAppDataFromCSVDir(dir string) (*AppData, error) {
 	if err := d.applyRecordSphereUpgrades(); err != nil {
 		return nil, fmt.Errorf("apply record sphere upgrades: %w", err)
 	}
+	d.classifyDamageTypes()
 	if err := d.loadSoulBreaks(); err != nil {
 		return nil, fmt.Errorf("load soul breaks: %w", err)
 	}
@@ -213,6 +214,52 @@ func (d *AppData) applyRecordSphereUpgrades() error {
 	}
 	log.Printf("Applied %d record sphere school upgrades", upgrades)
 	return nil
+}
+
+var phySchools = map[string]bool{
+	"Combat": true, "Celerity": true, "Spellblade": true, "Dragoon": true,
+	"Monk": true, "Thief": true, "Knight": true, "Samurai": true,
+	"Sharpshooter": true, "Machinist": true, "Heavy": true,
+}
+
+var magSchools = map[string]bool{
+	"Black Magic": true, "Summoning": true, "Witch": true,
+}
+
+var mndSchools = map[string]bool{
+	"White Magic": true,
+}
+
+func (d *AppData) classifyDamageTypes() {
+	for i := range d.Characters {
+		c := &d.Characters[i]
+		var types []string
+		hasPHY, hasMAG, hasMND := false, false, false
+		for school, level := range c.Schools {
+			if level < 5 {
+				continue
+			}
+			if phySchools[school] {
+				hasPHY = true
+			}
+			if magSchools[school] {
+				hasMAG = true
+			}
+			if mndSchools[school] {
+				hasMND = true
+			}
+		}
+		if hasPHY {
+			types = append(types, "PHY")
+		}
+		if hasMAG {
+			types = append(types, "MAG")
+		}
+		if hasMND {
+			types = append(types, "MND")
+		}
+		c.DamageType = strings.Join(types, "/")
+	}
 }
 
 var invalidTiers = map[string]bool{

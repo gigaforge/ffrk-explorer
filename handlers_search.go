@@ -18,6 +18,7 @@ type searchRequest struct {
 	Character         string
 	characterLower    string
 	Realm             string
+	DamageType        string
 	Tier              string
 	Element           string
 	Imperil           string
@@ -35,6 +36,7 @@ func parseSearchRequest(r *http.Request) searchRequest {
 	req := searchRequest{
 		Character:    q.Get("character"),
 		Realm:        q.Get("realm"),
+		DamageType:   q.Get("type"),
 		Tier:         q.Get("tier"),
 		Element:      q.Get("element"),
 		Imperil:      q.Get("imperil"),
@@ -86,6 +88,9 @@ func filterSearchCharacters(d *AppData, req searchRequest) []Character {
 			continue
 		}
 		if req.Realm != "" && c.Realm != req.Realm {
+			continue
+		}
+		if req.DamageType != "" && !strings.Contains(c.DamageType, req.DamageType) {
 			continue
 		}
 		if !characterMatchesSchoolReqs(c, req.SchoolReqs, req.SchoolMode) {
@@ -305,6 +310,7 @@ func buildSearchData(req searchRequest, results []SearchResult, truncated bool, 
 
 	data.Query.Character = req.Character
 	data.Query.Realm = req.Realm
+	data.Query.DamageType = req.DamageType
 	data.Query.Tier = req.Tier
 	data.Query.Element = req.Element
 	data.Query.Imperil = req.Imperil
