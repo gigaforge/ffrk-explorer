@@ -42,7 +42,7 @@
   <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
   <button onclick="openSchoolsModal()">Job Requirements<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
   <button class="search-btn" onclick="doSearch()">Search</button>
-  <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only"> Owned only</label>
+  <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only" onchange="document.cookie='owned_only='+(this.checked?'1':'0')+';path=/;max-age=31536000'"> Owned only</label>
   <div class="auth-area" id="auth-area"></div>
 </div>
 <div class="auth-modal-overlay" id="login-modal">
@@ -274,8 +274,9 @@ function renderAuth(username,apiKey){
     }
     html+='<button onclick="doLogout()">Logout</button>';
     area.innerHTML=html;window.__apiKey=apiKey;document.getElementById('owned-filter').style.display='';
+    if(!new URLSearchParams(window.location.search).has('owned')&&document.cookie.match(/(?:^|;\s*)owned_only=1/)){document.getElementById('owned-only').checked=true}
   }
-  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false;window.__apiKey=null}
+  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false;document.cookie='owned_only=0;path=/;max-age=0';window.__apiKey=null}
 }
 function toggleApiKey(btn){
   var tooltip=document.getElementById('api-key-tooltip');
