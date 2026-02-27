@@ -140,11 +140,15 @@ func (d *AppData) loadCharacters() error {
 		return err
 	}
 	for _, row := range rows {
+		atk, _ := strconv.Atoi(row["ATK"])
+		mag, _ := strconv.Atoi(row["MAG"])
 		c := Character{
 			Realm:   row["Realm"],
 			Name:    row["Name"],
 			Img:     row["Img"],
 			ID:      row["ID"],
+			ATK:     atk,
+			MAG:     mag,
 			Schools: make(map[string]int),
 		}
 		for _, s := range schoolNames {
@@ -239,7 +243,12 @@ func (d *AppData) classifyDamageTypes() {
 			if level < 5 {
 				continue
 			}
-			if phySchools[school] {
+			if school == "Sharpshooter" {
+				// Sharpshooter only counts as PHY if ATK > MAG
+				if c.ATK > c.MAG {
+					hasPHY = true
+				}
+			} else if phySchools[school] {
 				hasPHY = true
 			}
 			if magSchools[school] {

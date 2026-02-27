@@ -7,6 +7,8 @@ type Character struct {
 	Name       string
 	Img        string
 	ID         string
+	ATK        int
+	MAG        int
 	Schools    map[string]int // school name -> max rarity (1-6)
 	DamageType string         // "PHY", "MAG", "MND", or combinations like "PHY/MAG"
 }
