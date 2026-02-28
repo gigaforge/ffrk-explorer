@@ -329,6 +329,12 @@ func (d *AppData) loadSoulBreaks() error {
 		d.TierNames = append(d.TierNames, t)
 	}
 	sort.Strings(d.TierNames)
+	for name, sbList := range d.SoulBreaks {
+		sort.Slice(sbList, func(i, j int) bool {
+			return sbList[i].ID > sbList[j].ID
+		})
+		d.SoulBreaks[name] = sbList
+	}
 	return nil
 }
 
