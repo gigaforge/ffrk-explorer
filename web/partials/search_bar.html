@@ -171,12 +171,25 @@ function toggleSearchBar(){
   }
   updateSearchBarHeight();
 }
-if(window.innerWidth<=768){
+function applySearchBarCollapse(){
   var bar=document.querySelector('.search-bar');
-  if(bar) bar.classList.add('collapsed');
+  if(!bar) return;
+  var btn=document.getElementById('search-bar-toggle');
+  if(window.innerWidth<=768){
+    if(!bar.classList.contains('collapsed')){
+      bar.classList.add('collapsed');
+      btn.innerHTML='&#128269; Open Search';
+    }
+  } else {
+    if(bar.classList.contains('collapsed')){
+      bar.classList.remove('collapsed');
+      btn.textContent='Cancel';
+    }
+  }
+  updateSearchBarHeight();
 }
-updateSearchBarHeight();
-window.addEventListener('resize', updateSearchBarHeight);
+applySearchBarCollapse();
+window.addEventListener('resize', applySearchBarCollapse);
 if (window.ResizeObserver) {
   new ResizeObserver(updateSearchBarHeight).observe(document.querySelector('.search-bar'));
 }
