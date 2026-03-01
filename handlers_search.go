@@ -33,8 +33,12 @@ type searchRequest struct {
 
 func parseSearchRequest(r *http.Request) searchRequest {
 	q := r.URL.Query()
+	characterQuery := q.Get("ffrk-character")
+	if characterQuery == "" {
+		characterQuery = q.Get("character")
+	}
 	req := searchRequest{
-		Character:    q.Get("character"),
+		Character:    characterQuery,
 		Realm:        q.Get("realm"),
 		DamageType:   q.Get("type"),
 		Tier:         q.Get("tier"),

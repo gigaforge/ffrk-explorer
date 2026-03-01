@@ -3,7 +3,7 @@
 <div class="search-bar">
   <button class="search-bar-toggle" id="search-bar-toggle" onclick="toggleSearchBar()">&#128269; Open Search</button>
   <label>Character</label>
-  <input type="text" id="char-input" name="character-search" list="char-list" placeholder="Name..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
+  <input type="text" id="char-input" name="ffrk-character" list="char-list" placeholder="Name..." autocomplete="ffrkjunk" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
   <datalist id="char-list"></datalist>
   <label>Realm</label>
   <select id="realm-select">
@@ -254,7 +254,7 @@ document.getElementById('schools-modal').addEventListener('click',function(e){
 });
 function doSearch(){
   var p=new URLSearchParams();
-  var c=document.getElementById('char-input').value;if(c)p.set('character',c);
+  var c=document.getElementById('char-input').value;if(c)p.set('ffrk-character',c);
   var r=document.getElementById('realm-select').value;if(r)p.set('realm',r);
   var ty=document.getElementById('type-select').value;if(ty)p.set('type',ty);
   var t=document.getElementById('tier-select').value;if(t)p.set('tier',t);
@@ -320,7 +320,8 @@ function doLogout(){
 fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(function(d){if(d&&d.username){renderAuth(d.username,d.api_key);window.__currentUser=d.username}else{renderAuth(null)}});
 (function(){
   var p=new URLSearchParams(window.location.search);
-  if(p.get('character'))document.getElementById('char-input').value=p.get('character');
+  var c=p.get('ffrk-character')||p.get('character');
+  if(c)document.getElementById('char-input').value=c;
   if(p.get('realm'))document.getElementById('realm-select').value=p.get('realm');
   if(p.get('type'))document.getElementById('type-select').value=p.get('type');
   if(p.get('element'))document.getElementById('en-element-select').value=p.get('element');
