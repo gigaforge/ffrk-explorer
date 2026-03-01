@@ -301,6 +301,9 @@ func (d *AppData) pairArcaneDyads() {
 		for i, sb := range sbList {
 			if sb.Tier == "ADSB" && !strings.HasSuffix(sb.Name, "(Engaged)") {
 				if pi, ok := primaries[sb.SBVer]; ok {
+					if pi == i {
+						continue
+					}
 					ad := sb
 					sbList[pi].ArcaneDyad = &ad
 					// Strip "(Engaged)" from the primary's display name
