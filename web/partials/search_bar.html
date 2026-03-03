@@ -1,9 +1,33 @@
 {{define "search_bar"}}
 
+<div class="auth-modal-overlay" id="login-modal">
+  <div class="auth-modal">
+    <h3>Login</h3>
+    <div class="error-msg" id="login-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="login-username" autocomplete="username"></div>
+    <div class="form-group"><label>Password</label><input type="password" id="login-password" autocomplete="current-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doLogin()">Login</button>
+    </div>
+  </div>
+</div>
+<div class="auth-modal-overlay" id="register-modal">
+  <div class="auth-modal">
+    <h3>Register</h3>
+    <div class="error-msg" id="register-error"></div>
+    <div class="form-group"><label>Username</label><input type="text" id="register-username" autocomplete="username"></div>
+    <div class="form-group"><label>Password (min 6 chars)</label><input type="password" id="register-password" autocomplete="new-password"></div>
+    <div class="modal-buttons">
+      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
+      <button onclick="doRegister()">Register</button>
+    </div>
+  </div>
+</div>
 <div class="search-bar">
   <button class="search-bar-toggle" id="search-bar-toggle" onclick="toggleSearchBar()">&#128269; Open Search</button>
   <label>Character</label>
-  <input type="text" id="char-input" name="ffrk-character" list="char-list" placeholder="Name..." autocomplete="ffrkjunk" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
+  <input type="text" id="char-input" name="ffrk-character" list="char-list" placeholder="Character..." autocomplete="ffrkjunk" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
   <datalist id="char-list"></datalist>
   <label>Realm</label>
   <select id="realm-select">
@@ -44,30 +68,6 @@
   <button class="search-btn" onclick="doSearch()">Search</button>
   <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only" onchange="document.cookie='owned_only='+(this.checked?'1':'0')+';path=/;max-age=31536000'"> Owned only</label>
   <div class="auth-area" id="auth-area"></div>
-</div>
-<div class="auth-modal-overlay" id="login-modal">
-  <div class="auth-modal">
-    <h3>Login</h3>
-    <div class="error-msg" id="login-error"></div>
-    <div class="form-group"><label>Username</label><input type="text" id="login-username" autocomplete="username"></div>
-    <div class="form-group"><label>Password</label><input type="password" id="login-password" autocomplete="current-password"></div>
-    <div class="modal-buttons">
-      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
-      <button onclick="doLogin()">Login</button>
-    </div>
-  </div>
-</div>
-<div class="auth-modal-overlay" id="register-modal">
-  <div class="auth-modal">
-    <h3>Register</h3>
-    <div class="error-msg" id="register-error"></div>
-    <div class="form-group"><label>Username</label><input type="text" id="register-username" autocomplete="username"></div>
-    <div class="form-group"><label>Password (min 6 chars)</label><input type="password" id="register-password" autocomplete="new-password"></div>
-    <div class="modal-buttons">
-      <button class="secondary" onclick="closeAuthModals()">Cancel</button>
-      <button onclick="doRegister()">Register</button>
-    </div>
-  </div>
 </div>
 <div class="modal-overlay" id="effects-modal">
   <div class="modal">
