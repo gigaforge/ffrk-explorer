@@ -14,6 +14,8 @@ import (
 )
 
 const csvDir = "data"
+const csvDownloadTimeout = 20 * time.Second
+const csvDownloadAttempts = 2
 
 func csvPath(name string) string {
 	return filepath.Join(csvDir, name)
@@ -23,9 +25,19 @@ func sheetCSVURL(sheet csvSheet) string {
 	return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, sheet.GID)
 }
 
+func sheetGVizCSVURL(sheet csvSheet) string {
+	return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv&gid=%s", sheetID, sheet.GID)
+}
+
 func downloadCSV(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(url)
+	client := &http.Client{Timeout: csvDownloadTimeout}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("User-Agent", "ffrk-explorer-csv-updater/1.0")
+	req.Header.Set("Accept", "text/csv,*/*;q=0.8")
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("download: %w", err)
 	}
@@ -34,6 +46,34 @@ func downloadCSV(url string) ([]byte, error) {
 		return nil, fmt.Errorf("download: status %d", resp.StatusCode)
 	}
 	return io.ReadAll(resp.Body)
+}
+
+func downloadCSVWithRetry(url string, attempts int) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		data, err := downloadCSV(url)
+		if err == nil {
+			return data, nil
+		}
+		lastErr = err
+		if attempt < attempts {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+	}
+	return nil, fmt.Errorf("download %s failed after %d attempt(s): %w", url, attempts, lastErr)
+}
+
+func downloadSheetCSV(sheet csvSheet) ([]byte, error) {
+	urls := []string{sheetCSVURL(sheet), sheetGVizCSVURL(sheet)}
+	var errs []string
+	for _, url := range urls {
+		data, err := downloadCSVWithRetry(url, csvDownloadAttempts)
+		if err == nil {
+			return data, nil
+		}
+		errs = append(errs, err.Error())
+	}
+	return nil, fmt.Errorf("all CSV endpoints failed for gid=%s: %s", sheet.GID, strings.Join(errs, " | "))
 }
 
 func validateCSV(data []byte, expectedHeaders []string, currentRowCount int) error {
@@ -149,8 +189,7 @@ func ensureCSVs() {
 			continue
 		}
 		log.Printf("Missing %s, downloading...", sheet.Filename)
-		url := sheetCSVURL(sheet)
-		data, err := downloadCSV(url)
+		data, err := downloadSheetCSV(sheet)
 		if err != nil {
 			log.Fatalf("Failed to download %s: %v", sheet.Filename, err)
 		}
@@ -167,8 +206,7 @@ func ensureCSVs() {
 func updateCSVs() {
 	updates := make(map[string][]byte)
 	for _, sheet := range csvSheets {
-		url := sheetCSVURL(sheet)
-		data, err := downloadCSV(url)
+		data, err := downloadSheetCSV(sheet)
 		if err != nil {
 			log.Printf("WARNING: failed to download %s: %v", sheet.Filename, err)
 			continue

@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+const csvUpdateInterval = 6 * time.Hour
+
 // ---------- main ----------
 
 func main() {
@@ -20,13 +22,7 @@ func main() {
 	log.Println("Loading user data...")
 	initUserData()
 
-	go func() {
-		ticker := time.NewTicker(6 * time.Hour)
-		for range ticker.C {
-			log.Println("Auto-updating CSVs from Google Sheets...")
-			updateCSVs()
-		}
-	}()
+	go runCSVAutoUpdateLoop()
 
 	http.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir("images"))))
 	http.HandleFunc("/", indexHandler)
@@ -44,4 +40,17 @@ func main() {
 	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)
 	log.Fatal(http.ListenAndServe(addr, nil))
+}
+
+func runCSVAutoUpdateLoop() {
+	time.Sleep(5 * time.Second)
+	log.Println("Attempting immediate CSV update from Google Sheets...")
+	updateCSVs()
+
+	ticker := time.NewTicker(csvUpdateInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		log.Println("Auto-updating CSVs from Google Sheets...")
+		updateCSVs()
+	}
 }
