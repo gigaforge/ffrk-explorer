@@ -26,6 +26,16 @@ var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
 var sorceryBoostRe = regexp.MustCompile(`(?i)sorcery damage \+\d+%`)
 var pentabreakBoostRe = regexp.MustCompile(`(?i)pentabreak damage boost`)
 
+func hasPatternWithTrailingAllies(text string, re *regexp.Regexp) bool {
+	for _, idx := range re.FindAllStringIndex(text, -1) {
+		tail := strings.ToLower(text[idx[1]:])
+		if strings.Contains(tail, "to all allies") || strings.Contains(tail, "to allies") {
+			return true
+		}
+	}
+	return false
+}
+
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
 	"aegis_counter": func(text string) bool {
@@ -65,8 +75,14 @@ var effectCheckers = map[string]func(string) bool{
 	"crit_chance": func(text string) bool {
 		return critChanceRe.MatchString(text)
 	},
+	"party_crit_chance": func(text string) bool {
+		return hasPatternWithTrailingAllies(text, critChanceRe)
+	},
 	"crit_damage": func(text string) bool {
 		return critDamageRe.MatchString(text)
+	},
+	"party_crit_damage": func(text string) bool {
+		return hasPatternWithTrailingAllies(text, critDamageRe)
 	},
 	"sb_gauge": func(text string) bool {
 		return sbGaugeRe.MatchString(text)
