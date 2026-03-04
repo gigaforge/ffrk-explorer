@@ -26,11 +26,26 @@ var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
 var sorceryBoostRe = regexp.MustCompile(`(?i)sorcery damage \+\d+%`)
 var pentabreakBoostRe = regexp.MustCompile(`(?i)pentabreak damage boost`)
 
-func hasPatternWithTrailingAllies(text string, re *regexp.Regexp) bool {
+func hasPartyCritPattern(text string, re *regexp.Regexp) bool {
+	lowerText := strings.ToLower(text)
 	for _, idx := range re.FindAllStringIndex(text, -1) {
-		tail := strings.ToLower(text[idx[1]:])
-		if strings.Contains(tail, "to all allies") || strings.Contains(tail, "to allies") {
-			return true
+		tail := lowerText[idx[1]:]
+		if len(tail) == 0 {
+			continue
+		}
+
+		searchFrom := 0
+		for {
+			alliesIdx := strings.Index(tail[searchFrom:], "to all allies")
+			if alliesIdx < 0 {
+				break
+			}
+			alliesPos := searchFrom + alliesIdx
+			between := tail[:alliesPos]
+			if !strings.Contains(between, "to the user") {
+				return true
+			}
+			searchFrom = alliesPos + len("to all allies")
 		}
 	}
 	return false
@@ -76,13 +91,13 @@ var effectCheckers = map[string]func(string) bool{
 		return critChanceRe.MatchString(text)
 	},
 	"party_crit_chance": func(text string) bool {
-		return hasPatternWithTrailingAllies(text, critChanceRe)
+		return hasPartyCritPattern(text, critChanceRe)
 	},
 	"crit_damage": func(text string) bool {
 		return critDamageRe.MatchString(text)
 	},
 	"party_crit_damage": func(text string) bool {
-		return hasPatternWithTrailingAllies(text, critDamageRe)
+		return hasPartyCritPattern(text, critDamageRe)
 	},
 	"sb_gauge": func(text string) bool {
 		return sbGaugeRe.MatchString(text)
