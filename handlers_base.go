@@ -108,9 +108,7 @@ var summaryEffects = []struct {
 	{"fullbreak_counter", "Fullbreak Counter"},
 	{"phys_job_break_counter", "Phys Job Break Counter"},
 	{"mag_job_break_counter", "Mag Job Break Counter"},
-	{"haste", "Haste"},
-	{"protect", "Protect"},
-	{"shell", "Shell"},
+	{"proshellga", "Proshellga"},
 	{"last_stand", "Last Stand"},
 	{"regenga", "Regenga"},
 	{"astra", "Astra"},
@@ -126,20 +124,25 @@ var summaryEffects = []struct {
 func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]bool) []EffectSummary {
 	var summary []EffectSummary
 	for _, eff := range summaryEffects {
-		checker := effectCheckers[eff.Key]
-		if checker == nil {
-			continue
-		}
 		count := 0
 		for _, m := range members {
 			for _, sb := range m.SoulBreaks {
 				if loggedIn && !owned[sb.ID] {
 					continue
 				}
-				found := walkSBTexts(sb, sbTextWalkOptions{
-					IncludeStatuses: true,
-					IncludeBrave:    true,
-				}, checker)
+				var found bool
+				if eff.Key == "proshellga" {
+					found = sbMatchesProshellga(sb)
+				} else {
+					checker := effectCheckers[eff.Key]
+					if checker == nil {
+						continue
+					}
+					found = walkSBTexts(sb, sbTextWalkOptions{
+						IncludeStatuses: true,
+						IncludeBrave:    true,
+					}, checker)
+				}
 				if found {
 					count++
 				}

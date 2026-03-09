@@ -74,6 +74,12 @@ var effectCheckers = map[string]func(string) bool{
 	"shell": func(text string) bool {
 		return containsCI(text, "[Shell]") || containsCI(text, "Shell]")
 	},
+	"proshellga": func(text string) bool {
+		hasHaste := containsCI(text, "[Haste]") || containsCI(text, "Haste]")
+		hasProtect := containsCI(text, "[Protect]") || containsCI(text, "Protect]")
+		hasShell := containsCI(text, "[Shell]") || containsCI(text, "Shell]")
+		return hasHaste && hasProtect && hasShell
+	},
 	"last_stand": func(text string) bool {
 		return containsCI(text, "Last Stand")
 	},
@@ -218,10 +224,25 @@ func walkSBTexts(sb SoulBreak, opts sbTextWalkOptions, visit func(string) bool) 
 	return false
 }
 
+// sbMatchesProshellga checks if a soul break provides all three of Haste, Protect, and Shell
+// across any of its text fields.
+func sbMatchesProshellga(sb SoulBreak) bool {
+	opts := sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}
+	return walkSBTexts(sb, opts, effectCheckers["haste"]) &&
+		walkSBTexts(sb, opts, effectCheckers["protect"]) &&
+		walkSBTexts(sb, opts, effectCheckers["shell"])
+}
+
 // sbMatchesAdditionalEffects checks if a soul break matches the given effect filters using the specified mode.
 func sbMatchesAdditionalEffects(sb SoulBreak, effects []string, mode string) bool {
 	if mode == "or" {
 		for _, eff := range effects {
+			if eff == "proshellga" {
+				if sbMatchesProshellga(sb) {
+					return true
+				}
+				continue
+			}
 			checker, ok := effectCheckers[eff]
 			if !ok {
 				continue
@@ -233,6 +254,12 @@ func sbMatchesAdditionalEffects(sb SoulBreak, effects []string, mode string) boo
 		return false
 	}
 	for _, eff := range effects {
+		if eff == "proshellga" {
+			if !sbMatchesProshellga(sb) {
+				return false
+			}
+			continue
+		}
 		checker, ok := effectCheckers[eff]
 		if !ok {
 			continue
