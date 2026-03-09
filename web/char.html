@@ -62,6 +62,15 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 td.sb-owned { width: 24px; padding: 4px; text-align: center; }
 td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; width: 16px; height: 16px; }
+.party-add-btn { background: #0f3460; color: #e0e0e0; border: 1px solid #e94560; border-radius: 4px;
+                 padding: 6px 14px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+.party-add-btn:hover { background: #e94560; color: #fff; }
+.party-add-btn.in-party { background: #1b4332; border-color: #4caf50; color: #4caf50; }
+.party-add-btn.in-party:hover { background: #4caf50; color: #fff; }
+#replace-list button { display: block; width: 100%; text-align: left; background: #16213e;
+                       border: 1px solid #0f3460; color: #e0e0e0; padding: 8px 12px;
+                       margin-bottom: 6px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+#replace-list button:hover { border-color: #e94560; color: #e94560; }
 
 @media (max-width: 768px) {
   body { padding-left: 12px; padding-right: 12px; }
@@ -169,8 +178,21 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 </head><body>
 {{template "search_bar" .}}
 <a class="back" href="/">← All Characters</a>
-<h1>{{.Character.Name}}</h1>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <h1 style="margin-bottom:0;">{{.Character.Name}}</h1>
+  <button id="party-btn" class="party-add-btn" onclick="addToParty('{{.Character.ID}}','{{.Character.Name}}')" style="display:none;"></button>
+</div>
 <div class="subtitle">{{.Character.Realm}}</div>
+<div class="auth-modal-overlay" id="replace-modal">
+  <div class="auth-modal" style="max-width:340px;">
+    <h3>Party Full</h3>
+    <p style="margin-bottom:12px;color:#aaa;">Choose a character to replace:</p>
+    <div id="replace-list"></div>
+    <div class="modal-buttons" style="margin-top:12px;">
+      <button class="secondary" onclick="closeReplaceModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <h2>Ability Schools</h2>
 <div class="school-grid">
@@ -531,6 +553,68 @@ function toggleOwned(cb){
   .then(function(r){if(!r.ok){cb.checked=!owned}});
 }
 function onAuthChange(){window.location.reload()}
+
+// --- Party Builder ---
+var PARTY_MAX=5;
+function getParty(){try{return JSON.parse(localStorage.getItem('ffrk_party'))||[]}catch(e){return[]}}
+function saveParty(ids){localStorage.setItem('ffrk_party',JSON.stringify(ids))}
+function updatePartyBtn(charID){
+  var btn=document.getElementById('party-btn');
+  var ids=getParty();
+  if(ids.indexOf(charID)!==-1){
+    btn.textContent='In Party';
+    btn.className='party-add-btn in-party';
+    btn.onclick=function(){removeFromParty(charID)};
+  } else {
+    btn.textContent='Add to Party';
+    btn.className='party-add-btn';
+    btn.onclick=function(){addToParty(charID)};
+  }
+  btn.style.display='';
+}
+function addToParty(charID){
+  var ids=getParty();
+  if(ids.indexOf(charID)!==-1) return;
+  if(ids.length>=PARTY_MAX){
+    showReplaceModal(charID);
+    return;
+  }
+  ids.push(charID);
+  saveParty(ids);
+  updatePartyBtn(charID);
+}
+function removeFromParty(charID){
+  var ids=getParty().filter(function(x){return x!==charID});
+  saveParty(ids);
+  updatePartyBtn(charID);
+}
+function showReplaceModal(newID){
+  var ids=getParty();
+  var list=document.getElementById('replace-list');
+  list.innerHTML='';
+  ids.forEach(function(id){
+    var btn=document.createElement('button');
+    btn.textContent=partyNames[id]||('Character '+id);
+    btn.onclick=function(){
+      var updated=ids.filter(function(x){return x!==id});
+      updated.push(newID);
+      saveParty(updated);
+      closeReplaceModal();
+      updatePartyBtn(newID);
+    };
+    list.appendChild(btn);
+  });
+  document.getElementById('replace-modal').classList.add('visible');
+}
+function closeReplaceModal(){document.getElementById('replace-modal').classList.remove('visible')}
+document.getElementById('replace-modal').addEventListener('click',function(e){if(e.target===this)closeReplaceModal()});
+
+// Load party names from localStorage and register current character
+var partyNames={};
+try{partyNames=JSON.parse(localStorage.getItem('ffrk_party_names'))||{}}catch(e){partyNames={}}
+partyNames['{{.Character.ID}}']='{{.Character.Name}}';
+localStorage.setItem('ffrk_party_names',JSON.stringify(partyNames));
+updatePartyBtn('{{.Character.ID}}');
 </script>
 {{template "scroll_top" .}}
 {{template "kofi_widget" .}}</body></html>

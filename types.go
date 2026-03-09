@@ -197,6 +197,20 @@ type csvSheet struct {
 	ExpectedHeaders []string
 }
 
+type PartyMember struct {
+	Character     Character
+	HeroAbilities []HeroAbility
+	LegendMateria []LegendMateria
+	SoulBreaks    []SoulBreak
+}
+
+type PartyData struct {
+	Members         []PartyMember
+	AllCharacters   []Character
+	LoggedIn        bool
+	OwnedSoulbreaks map[string]bool
+}
+
 type SearchData struct {
 	Results         []SearchResult
 	Truncated       bool

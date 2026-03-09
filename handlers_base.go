@@ -27,6 +27,7 @@ func mustParseTemplate(name, path string) *template.Template {
 var indexTmpl = mustParseTemplate("index", "web/index.html")
 var charTmpl = mustParseTemplate("char", "web/char.html")
 var searchTmpl = mustParseTemplate("search", "web/search.html")
+var partyTmpl = mustParseTemplate("party", "web/party.html")
 
 // ---------- handlers ----------
 
@@ -53,6 +54,46 @@ func characterAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(names)
 	writeJSON(w, http.StatusOK, names)
+}
+
+func partyHandler(w http.ResponseWriter, r *http.Request) {
+	d, ok := requireAppData(w)
+	if !ok {
+		return
+	}
+
+	idsParam := r.URL.Query().Get("ids")
+	var members []PartyMember
+	if idsParam != "" {
+		for _, id := range strings.SplitN(idsParam, ",", 5) {
+			id = strings.TrimSpace(id)
+			ch, ok := d.CharByID[id]
+			if !ok {
+				continue
+			}
+			members = append(members, PartyMember{
+				Character:     *ch,
+				HeroAbilities: d.HeroAbilities[ch.Name],
+				LegendMateria: d.LegendMateria[ch.Name],
+				SoulBreaks:    d.SoulBreaks[ch.Name],
+			})
+		}
+	}
+
+	sorted := make([]Character, len(d.Characters))
+	copy(sorted, d.Characters)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+
+	data := PartyData{Members: members, AllCharacters: sorted}
+	u := getCurrentUser(r)
+	if u != nil {
+		data.LoggedIn = true
+		data.OwnedSoulbreaks = snapshotOwnedSoulbreaks(u.ID)
+	} else {
+		data.OwnedSoulbreaks = make(map[string]bool)
+	}
+
+	partyTmpl.Execute(w, data)
 }
 
 func tierAPIHandler(w http.ResponseWriter, r *http.Request) {

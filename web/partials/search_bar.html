@@ -63,9 +63,10 @@
     <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
     <option>Poison</option><option>Prismatic</option>
   </select>
-  <button onclick="openEffectsModal()">Additional Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
-  <button onclick="openSchoolsModal()">Job Requirements<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="openEffectsModal()">Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
+  <button onclick="openSchoolsModal()">Job<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
   <button class="search-btn" onclick="doSearch()">Search</button>
+  <a href="/party" id="party-link" class="party-link" onclick="goToParty(event)">Party<span id="party-count" class="effects-badge" style="display:none"></span></a>
   <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only" onchange="document.cookie='owned_only='+(this.checked?'1':'0')+';path=/;max-age=31536000'"> Owned only</label>
   <div class="auth-area" id="auth-area"></div>
 </div>
@@ -347,6 +348,25 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
     updateSchoolsBadge();
   }
   if(p.get('schoolmode')==='or')setSchoolMode('or');
+})();
+function goToParty(e){
+  e.preventDefault();
+  try{
+    var ids=JSON.parse(localStorage.getItem('ffrk_party'))||[];
+    var url='/party';
+    if(ids.length>0) url+='?ids='+ids.join(',');
+    window.location=url;
+  }catch(ex){window.location='/party'}
+}
+(function(){
+  try{
+    var ids=JSON.parse(localStorage.getItem('ffrk_party'))||[];
+    if(ids.length>0){
+      var badge=document.getElementById('party-count');
+      badge.textContent=ids.length;
+      badge.style.display='inline';
+    }
+  }catch(e){}
 })();
 </script>
 {{end}}

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Party Builder - FFRK Soul Break Tracker &amp; Search</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+       background: #1a1a2e; color: #e0e0e0; padding: 70px 20px 20px; max-width: 1200px; margin: 0 auto;
+       font-size: 16px; }
+{{template "search_bar_css" .}}
+a { color: #e94560; }
+h1 { color: #e94560; margin-bottom: 16px; }
+h2 { color: #0f3460; background: #e94560; display: inline-block;
+     padding: 4px 16px; border-radius: 4px; margin: 20px 0 12px; font-size: 1em; }
+h3 { color: #e94560; margin: 16px 0 8px; font-size: 1.1em; }
+.party-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.party-header h1 { margin-bottom: 0; }
+.clear-party-btn { background: #16213e; color: #e94560; border: 1px solid #e94560; border-radius: 4px;
+                   padding: 6px 14px; cursor: pointer; font-size: 14px; }
+.clear-party-btn:hover { background: #e94560; color: #fff; }
+.empty-party { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
+               padding: 30px; text-align: center; color: #888; font-size: 16px; }
+.empty-party a { color: #e94560; }
+.member { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
+          padding: 16px; margin-bottom: 20px; }
+.member-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.member-header img { width: 64px; height: 64px; object-fit: contain; }
+.member-info { flex: 1; }
+.member-info .name { font-size: 1.2em; font-weight: bold; color: #e94560; }
+.member-info .name a { text-decoration: none; }
+.member-info .realm { color: #888; font-size: 14px; }
+.remove-btn { background: none; border: 1px solid #666; color: #888; border-radius: 4px;
+              padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.remove-btn:hover { border-color: #e94560; color: #e94560; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 14px; }
+th { background: #0f3460; padding: 4px 8px; text-align: left; font-size: 13px; }
+td { background: #1a1a2e; padding: 4px 8px; border-bottom: 1px solid #16213e; }
+td img { width: 48px; height: 48px; object-fit: contain; vertical-align: middle; }
+.sb-icon { width: 48px; height: 48px; overflow: hidden; display: inline-block; vertical-align: middle; }
+.sb-icon img { width: 72px; height: 72px; object-fit: contain; margin: -12px; }
+.effects { max-width: 500px; font-size: 13px; }
+.section-label { font-size: 14px; font-weight: bold; color: #e9c46a; margin: 10px 0 6px; }
+.owned-mark { color: #4caf50; font-size: 13px; margin-left: 4px; }
+.unowned { opacity: 0.4; }
+
+/* Add character picker */
+.add-char-wrap { position: relative; }
+.add-char-input { background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460; border-radius: 4px;
+                  padding: 6px 10px; font-size: 14px; width: 220px; }
+.add-char-input:focus { outline: none; border-color: #e94560; }
+.add-char-input::placeholder { color: #666; }
+.add-char-dropdown { display: none; position: absolute; top: 100%; left: 0; z-index: 50;
+                     background: #16213e; border: 1px solid #0f3460; border-radius: 0 0 4px 4px;
+                     max-height: 260px; overflow-y: auto; width: 220px; }
+.add-char-dropdown.visible { display: block; }
+.add-char-dropdown .char-option { padding: 6px 10px; cursor: pointer; font-size: 14px; }
+.add-char-dropdown .char-option:hover, .add-char-dropdown .char-option.highlighted { background: #0f3460; color: #e94560; }
+.add-char-dropdown .char-option.in-party { color: #666; cursor: default; }
+.add-char-dropdown .no-results { padding: 8px 10px; color: #666; font-size: 13px; }
+
+/* Expandable row styles */
+tr.sb-row { cursor: pointer; }
+tr.sb-row:hover td { background: #1b2a4a; }
+td.sb-chevron { width: 16px; padding: 4px 2px; text-align: center; }
+td.sb-chevron .chevron { display: inline-block; font-size: 14px; color: #e94560;
+                          transition: transform 0.2s; }
+tr.sb-row.expanded td.sb-chevron .chevron { transform: rotate(90deg); }
+tr.sb-detail { display: none; }
+tr.sb-detail.visible { display: table-row; }
+tr.sb-detail td { background: #0d1a30; padding: 8px 16px; }
+.effect-list { list-style: none; padding: 0; margin: 0; }
+.effect-list li { padding: 4px 0; border-bottom: 1px solid #16213e; }
+.effect-list li:last-child { border-bottom: none; }
+.effect-name { color: #e94560; font-weight: bold; }
+.effect-duration { color: #e9c46a; font-size: 14px; margin-left: 8px; }
+.effect-desc { color: #aaa; font-size: 14px; display: block; margin-top: 2px; }
+.burst-commands { margin-bottom: 8px; }
+.burst-title { color: #e94560; font-weight: bold; margin-bottom: 6px; font-size: 15px; }
+.burst-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; font-size: 14px; }
+.burst-table th { background: #162040; padding: 4px 6px; text-align: left; font-size: 13px; }
+.burst-table td { background: #0f1a2e; padding: 4px 6px; border-bottom: 1px solid #1a1a2e; }
+.burst-icon { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; }
+tr.bc-row { cursor: pointer; }
+tr.bc-row:hover td { background: #152035; }
+tr.bc-row td.bc-chevron { width: 16px; padding: 4px 2px; text-align: center; }
+tr.bc-row td.bc-chevron .chevron { display: inline-block; font-size: 12px; color: #e94560;
+                                    transition: transform 0.2s; }
+tr.bc-row.expanded td.bc-chevron .chevron { transform: rotate(90deg); }
+tr.bc-detail { display: none; }
+tr.bc-detail.visible { display: table-row; }
+tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
+.brave-condition { color: #aaa; font-size: 13px; margin-bottom: 6px; }
+.brave-icon-wrap { position: relative; width: 32px; height: 32px; }
+.brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+.brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
+
+@media (max-width: 768px) {
+  body { padding-left: 12px; padding-right: 12px; }
+  .member { padding: 12px; }
+  table { font-size: 13px; }
+  td img { width: 36px; height: 36px; }
+  .sb-icon, .sb-icon img { width: 36px; height: 36px; }
+  .sb-icon img { width: 54px; height: 54px; margin: -9px; }
+  .effects { max-width: none; }
+
+  tr.sb-detail.visible { display: block; }
+  tr.sb-detail td { display: block; padding: 8px !important; }
+  tr.sb-detail td[colspan] { width: 100%; }
+
+  tr.bc-detail.visible { display: block; }
+  tr.bc-detail td { display: block; padding: 6px !important; }
+  tr.bc-detail td[colspan] { width: 100%; }
+}
+</style>
+</head><body>
+{{template "search_bar" .}}
+<a class="back" href="/" style="display:inline-block;margin-bottom:16px;">← All Characters</a>
+
+<div class="party-header">
+  <h1>Party Builder</h1>
+  <div class="add-char-wrap">
+    <input type="text" class="add-char-input" id="add-char-input" placeholder="Add character..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="add-char-dropdown" id="add-char-dropdown"></div>
+  </div>
+  {{if .Members}}
+  <button class="clear-party-btn" onclick="clearParty()">Clear Party</button>
+  {{end}}
+</div>
+<div class="auth-modal-overlay" id="replace-modal">
+  <div class="auth-modal" style="max-width:340px;">
+    <h3>Party Full</h3>
+    <p style="margin-bottom:12px;color:#aaa;">Choose a character to replace:</p>
+    <div id="replace-list"></div>
+    <div class="modal-buttons" style="margin-top:12px;">
+      <button class="secondary" onclick="closeReplaceModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+{{if not .Members}}
+<div class="empty-party">
+  Your party is empty. Type a character name above or visit a <a href="/">character's page</a> and click "Add to Party" to get started.
+</div>
+{{else}}
+{{range .Members}}
+<div class="member" data-charid="{{.Character.ID}}">
+  <div class="member-header">
+    {{if .Character.Img}}<img src="{{.Character.Img}}" alt="{{.Character.Name}}">{{end}}
+    <div class="member-info">
+      <div class="name"><a href="/char/{{.Character.ID}}">{{.Character.Name}}</a></div>
+      <div class="realm">{{.Character.Realm}}</div>
+    </div>
+    <button class="remove-btn" onclick="removeMember('{{.Character.ID}}')">Remove</button>
+  </div>
+
+  {{if .HeroAbilities}}
+  <div class="section-label">Hero Abilities</div>
+  <table>
+    <tr><th></th><th>Name</th><th>School</th><th>Type</th><th>Element</th><th>Effects</th></tr>
+    {{range .HeroAbilities}}
+    <tr>
+      <td>{{if .Img}}<img src="{{.Img}}">{{end}}</td>
+      <td>{{.Name}} ({{.HAVer}})</td>
+      <td>{{.School}}</td>
+      <td>{{.Type}}</td>
+      <td>{{.Element}}</td>
+      <td class="effects">{{.Effects}}</td>
+    </tr>
+    {{end}}
+  </table>
+  {{end}}
+
+  {{if .LegendMateria}}
+  <div class="section-label">Legend Materia</div>
+  <table>
+    <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Effect</th></tr>
+    {{range .LegendMateria}}
+    <tr class="sb-row{{if .MatchedEffects}} expandable{{end}}{{if and $.LoggedIn (ne .Tier "LM") (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}" onclick="toggleDetail(this)">
+      <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+      <td>{{if .Img}}<img src="{{.Img}}" style="width:32px;height:32px;">{{end}}</td>
+      <td>{{.Name}}{{if .LMVer}} ({{.LMVer}}){{end}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
+      <td>{{.Tier}}</td>
+      <td class="effects">{{.Effect}}</td>
+    </tr>
+    {{if .MatchedEffects}}
+    <tr class="sb-detail">
+      <td colspan="5">
+        <ul class="effect-list">
+        {{range .MatchedEffects}}
+          <li>
+            <span class="effect-name">{{.Name}}</span>
+            {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+            <span class="effect-desc">{{.Description}}</span>
+          </li>
+        {{end}}
+        </ul>
+      </td>
+    </tr>
+    {{end}}
+    {{end}}
+  </table>
+  {{end}}
+
+  {{if .SoulBreaks}}
+  <div class="section-label">Soul Breaks</div>
+  <table>
+    <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+    {{range .SoulBreaks}}
+    <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}" onclick="toggleDetail(this)">
+      <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
+      <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
+      <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
+      <td>{{.Tier}}</td>
+      <td>{{.Type}}</td>
+      <td>{{.Element}}</td>
+      <td>{{.Time}}</td>
+      <td class="effects">{{.Effects}}</td>
+    </tr>
+    {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
+    <tr class="sb-detail">
+      <td colspan="8">
+        {{if .BraveCommand}}
+        <div class="burst-commands">
+          <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
+          <div class="brave-condition">Condition: {{.BraveCommand.Condition}} | School: {{.BraveCommand.School}}</div>
+          <table class="burst-table">
+            <tr><th></th><th></th><th>Level</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            {{range .BraveCommand.Levels}}
+            <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td><div class="brave-icon-wrap"><img src="/images/brave/BraveAttack{{.Level}}.png" class="brave-bg"><img src="/images/brave/BraveBase.png" class="brave-fg"></div></td>
+              <td>{{.Level}}</td>
+              <td>{{.Type}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Element}}</td>
+              <td>{{.Time}}</td>
+              <td class="effects">{{.Effects}}</td>
+            </tr>
+            {{if .MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="8">
+                <ul class="effect-list">
+                {{range .MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .DualShift}}
+        <div class="burst-commands">
+          <div class="burst-title">Dual Shift</div>
+          <table class="burst-table">
+            <tr><th></th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            <tr class="bc-row{{if .DualShift.MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .DualShift.MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{.DualShift.Type}}</td>
+              <td>{{.DualShift.Element}}</td>
+              <td>{{.DualShift.Time}}</td>
+              <td class="effects">{{.DualShift.Effects}}</td>
+            </tr>
+            {{if .DualShift.MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="5">
+                <ul class="effect-list">
+                {{range .DualShift.MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .ArcaneDyad}}
+        <div class="burst-commands">
+          <div class="burst-title">Arcane Dyad Finisher</div>
+          <table class="burst-table">
+            <tr><th></th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            <tr class="bc-row{{if .ArcaneDyad.MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .ArcaneDyad.MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{.ArcaneDyad.Type}}</td>
+              <td>{{.ArcaneDyad.Element}}</td>
+              <td>{{.ArcaneDyad.Time}}</td>
+              <td class="effects">{{.ArcaneDyad.Effects}}</td>
+            </tr>
+            {{if .ArcaneDyad.MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="5">
+                <ul class="effect-list">
+                {{range .ArcaneDyad.MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .ZenithAbilities}}
+        <div class="burst-commands">
+          <div class="burst-title">Zenith SB Abilities</div>
+          <table class="burst-table">
+            <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            {{range .ZenithAbilities}}
+            <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+              <td>{{.Name}}</td>
+              <td>{{.School}}</td>
+              <td>{{.Type}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Element}}</td>
+              <td>{{.Time}}</td>
+              <td class="effects">{{.Effects}}</td>
+            </tr>
+            {{if .MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="9">
+                <ul class="effect-list">
+                {{range .MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .SynchroAbilities}}
+        <div class="burst-commands">
+          <div class="burst-title">Synchro Abilities</div>
+          <table class="burst-table">
+            <tr><th></th><th></th><th>Name</th><th>School</th><th>Condition</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            {{range .SynchroAbilities}}
+            <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+              <td>{{.Name}}</td>
+              <td>{{.School}}</td>
+              <td>{{.Condition}}</td>
+              <td>{{.Type}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Element}}</td>
+              <td>{{.Time}}</td>
+              <td class="effects">{{.Effects}}</td>
+            </tr>
+            {{if .MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="10">
+                <ul class="effect-list">
+                {{range .MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .BurstCommands}}
+        <div class="burst-commands">
+          <div class="burst-title">Burst Commands</div>
+          <table class="burst-table">
+            <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            {{range .BurstCommands}}
+            <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+              <td>{{.Name}}</td>
+              <td>{{.School}}</td>
+              <td>{{.Type}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Element}}</td>
+              <td>{{.Time}}</td>
+              <td class="effects">{{.Effects}}</td>
+            </tr>
+            {{if .MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="9">
+                <ul class="effect-list">
+                {{range .MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .TriggerAbilities}}
+        <div class="burst-commands">
+          <div class="burst-title">Trigger Abilities</div>
+          <table class="burst-table">
+            <tr><th></th><th></th><th>Name</th><th>School</th><th>Type</th><th>Target</th><th>Formula</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+            {{range .TriggerAbilities}}
+            <tr class="bc-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleBcDetail(this)">
+              <td class="bc-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
+              <td>{{if .Img}}<img src="{{.Img}}" class="burst-icon">{{end}}</td>
+              <td>{{.Name}}</td>
+              <td>{{.School}}</td>
+              <td>{{.Type}}</td>
+              <td>{{.Target}}</td>
+              <td>{{.Formula}}</td>
+              <td>{{.Multiplier}}</td>
+              <td>{{.Element}}</td>
+              <td>{{.Time}}</td>
+              <td class="effects">{{.Effects}}</td>
+            </tr>
+            {{if .MatchedEffects}}
+            <tr class="bc-detail">
+              <td colspan="11">
+                <ul class="effect-list">
+                {{range .MatchedEffects}}
+                  <li>
+                    <span class="effect-name">{{.Name}}</span>
+                    {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                    <span class="effect-desc">{{.Description}}</span>
+                  </li>
+                {{end}}
+                </ul>
+              </td>
+            </tr>
+            {{end}}
+            {{end}}
+          </table>
+        </div>
+        {{end}}
+        {{if .MatchedEffects}}
+        <ul class="effect-list">
+        {{range .MatchedEffects}}
+          <li>
+            <span class="effect-name">{{.Name}}</span>
+            {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+            <span class="effect-desc">{{.Description}}</span>
+          </li>
+        {{end}}
+        </ul>
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+    {{end}}
+  </table>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+
+<script>
+function toggleDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('sb-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+}
+function toggleBcDetail(row) {
+  var detail = row.nextElementSibling;
+  if (!detail || !detail.classList.contains('bc-detail')) return;
+  row.classList.toggle('expanded');
+  detail.classList.toggle('visible');
+  event.stopPropagation();
+}
+function getParty(){
+  try { return JSON.parse(localStorage.getItem('ffrk_party'))||[]; } catch(e){ return []; }
+}
+function saveParty(ids){
+  localStorage.setItem('ffrk_party', JSON.stringify(ids));
+}
+function syncURL(){
+  var ids=getParty();
+  var url='/party';
+  if(ids.length>0) url+='?ids='+ids.join(',');
+  window.location=url;
+}
+function removeMember(id){
+  var ids=getParty().filter(function(x){return x!==id});
+  saveParty(ids);
+  syncURL();
+}
+function clearParty(){
+  saveParty([]);
+  syncURL();
+}
+// On load, check if URL matches localStorage and redirect if needed
+(function(){
+  var ids=getParty();
+  var params=new URLSearchParams(window.location.search);
+  var urlIds=params.get('ids')||'';
+  var expected=ids.join(',');
+  if(urlIds!==expected){
+    var url='/party';
+    if(ids.length>0) url+='?ids='+ids.join(',');
+    window.location.replace(url);
+  }
+})();
+function onAuthChange(){window.location.reload()}
+
+// --- Add Character Picker ---
+var allChars=[{{range .AllCharacters}}{n:"{{.Name}}",id:"{{.ID}}"},{{end}}];
+var input=document.getElementById('add-char-input');
+var dropdown=document.getElementById('add-char-dropdown');
+var highlightIdx=-1;
+var visibleOptions=[];
+
+function renderDropdown(filter){
+  var party=getParty();
+  var lower=filter.toLowerCase();
+  dropdown.innerHTML='';
+  visibleOptions=[];
+  highlightIdx=-1;
+  if(!filter){dropdown.classList.remove('visible');return}
+  var matches=allChars.filter(function(c){return c.n.toLowerCase().indexOf(lower)!==-1});
+  if(matches.length===0){
+    dropdown.innerHTML='<div class="no-results">No characters found</div>';
+    dropdown.classList.add('visible');
+    return;
+  }
+  matches.forEach(function(c){
+    var div=document.createElement('div');
+    div.className='char-option';
+    div.textContent=c.n;
+    div.setAttribute('data-id',c.id);
+    if(party.indexOf(c.id)!==-1){
+      div.classList.add('in-party');
+      div.textContent=c.n+' (in party)';
+    }
+    div.addEventListener('mousedown',function(e){
+      e.preventDefault();
+      pickCharacter(c.id,c.n);
+    });
+    dropdown.appendChild(div);
+    visibleOptions.push(div);
+  });
+  dropdown.classList.add('visible');
+}
+
+function pickCharacter(id,name){
+  var party=getParty();
+  if(party.indexOf(id)!==-1) return;
+  // Store name for replace modal
+  try{var pn=JSON.parse(localStorage.getItem('ffrk_party_names'))||{}}catch(e){var pn={}}
+  pn[id]=name;
+  localStorage.setItem('ffrk_party_names',JSON.stringify(pn));
+  if(party.length>=5){
+    pendingAddId=id;
+    pendingAddName=name;
+    showReplaceModal();
+    return;
+  }
+  party.push(id);
+  saveParty(party);
+  input.value='';
+  dropdown.classList.remove('visible');
+  syncURL();
+}
+
+var pendingAddId=null,pendingAddName=null;
+function showReplaceModal(){
+  var ids=getParty();
+  var list=document.getElementById('replace-list');
+  list.innerHTML='';
+  try{var pn=JSON.parse(localStorage.getItem('ffrk_party_names'))||{}}catch(e){var pn={}}
+  ids.forEach(function(id){
+    var btn=document.createElement('button');
+    btn.textContent=pn[id]||('Character '+id);
+    btn.onclick=function(){
+      var updated=ids.filter(function(x){return x!==id});
+      updated.push(pendingAddId);
+      saveParty(updated);
+      closeReplaceModal();
+      input.value='';
+      dropdown.classList.remove('visible');
+      syncURL();
+    };
+    list.appendChild(btn);
+  });
+  document.getElementById('replace-modal').classList.add('visible');
+}
+function closeReplaceModal(){document.getElementById('replace-modal').classList.remove('visible');pendingAddId=null;pendingAddName=null}
+document.getElementById('replace-modal').addEventListener('click',function(e){if(e.target===this)closeReplaceModal()});
+
+input.addEventListener('input',function(){renderDropdown(this.value)});
+input.addEventListener('focus',function(){if(this.value)renderDropdown(this.value)});
+input.addEventListener('blur',function(){setTimeout(function(){dropdown.classList.remove('visible')},150)});
+input.addEventListener('keydown',function(e){
+  if(!dropdown.classList.contains('visible'))return;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(highlightIdx<visibleOptions.length-1){highlightIdx++;updateHighlight()}
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(highlightIdx>0){highlightIdx--;updateHighlight()}
+  } else if(e.key==='Enter'){
+    e.preventDefault();
+    if(highlightIdx>=0&&highlightIdx<visibleOptions.length){
+      var opt=visibleOptions[highlightIdx];
+      if(!opt.classList.contains('in-party')){
+        var id=opt.getAttribute('data-id');
+        var name=opt.textContent.replace(' (in party)','');
+        pickCharacter(id,name);
+      }
+    }
+  } else if(e.key==='Escape'){
+    dropdown.classList.remove('visible');
+    input.blur();
+  }
+});
+function updateHighlight(){
+  visibleOptions.forEach(function(o,i){o.classList.toggle('highlighted',i===highlightIdx)});
+  if(highlightIdx>=0&&visibleOptions[highlightIdx]){visibleOptions[highlightIdx].scrollIntoView({block:'nearest'})}
+}
+</script>
+{{template "scroll_top" .}}
+{{template "kofi_widget" .}}</body></html>

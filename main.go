@@ -28,6 +28,7 @@ func main() {
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/char/", charHandler)
 	http.HandleFunc("/search", searchHandler)
+	http.HandleFunc("/party", partyHandler)
 	http.HandleFunc("/api/characters", characterAPIHandler)
 	http.HandleFunc("/api/tiers", tierAPIHandler)
 	http.HandleFunc("/api/login", loginHandler)
