@@ -63,6 +63,17 @@ body.hide-unowned .unowned + tr.sb-detail { display: none !important; }
 .add-char-dropdown .char-option.in-party { color: #666; cursor: default; }
 .add-char-dropdown .no-results { padding: 8px 10px; color: #666; font-size: 13px; }
 
+/* Summary panel */
+.summary-panel { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
+                 padding: 12px 16px; margin-bottom: 20px; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; }
+.summary-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 14px; color: #888; }
+.summary-item.has-effect { color: #e0e0e0; }
+.summary-check { color: #4caf50; font-size: 15px; min-width: 16px; }
+.summary-count { font-size: 12px; color: #4caf50; margin-left: 1px; }
+.summary-x { color: #e94560; font-size: 15px; min-width: 16px; }
+.summary-label { white-space: nowrap; }
+
 /* Expandable row styles */
 tr.sb-row { cursor: pointer; }
 tr.sb-row:hover td { background: #1b2a4a; }
@@ -150,6 +161,21 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   Your party is empty. Type a character name above or visit a <a href="/">character's page</a> and click "Add to Party" to get started.
 </div>
 {{else}}
+
+{{if .EffectSummary}}
+<div class="summary-panel">
+  <div class="section-label">Party Effect Summary{{if .LoggedIn}} <span style="font-weight:normal;color:#888;font-size:12px;">(owned SBs only)</span>{{end}}</div>
+  <div class="summary-grid">
+    {{range .EffectSummary}}
+    <div class="summary-item{{if gt .Count 0}} has-effect{{end}}">
+      {{if gt .Count 0}}<span class="summary-check">&#10004;{{if gt .Count 1}}<span class="summary-count">x{{.Count}}</span>{{end}}</span>{{else}}<span class="summary-x">&#10008;</span>{{end}}
+      <span class="summary-label">{{.Label}}</span>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{range .Members}}
 <div class="member" data-charid="{{.Character.ID}}">
   <div class="member-header">

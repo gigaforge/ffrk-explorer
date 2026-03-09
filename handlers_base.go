@@ -93,7 +93,65 @@ func partyHandler(w http.ResponseWriter, r *http.Request) {
 		data.OwnedSoulbreaks = make(map[string]bool)
 	}
 
+	if len(members) > 0 {
+		data.EffectSummary = buildEffectSummary(members, data.LoggedIn, data.OwnedSoulbreaks)
+	}
+
 	partyTmpl.Execute(w, data)
+}
+
+var summaryEffects = []struct {
+	Key   string
+	Label string
+}{
+	{"aegis_counter", "Aegis Counter"},
+	{"fullbreak_counter", "Fullbreak Counter"},
+	{"phys_job_break_counter", "Phys Job Break Counter"},
+	{"mag_job_break_counter", "Mag Job Break Counter"},
+	{"haste", "Haste"},
+	{"protect", "Protect"},
+	{"shell", "Shell"},
+	{"last_stand", "Last Stand"},
+	{"regenga", "Regenga"},
+	{"astra", "Astra"},
+	{"party_crit_chance", "Party Crit Chance"},
+	{"party_crit_damage", "Party Crit Damage"},
+	{"weakness_boost", "Weakness Boost"},
+	{"magical_boost", "Magical Boost"},
+	{"phy_boost", "PHY Boost"},
+	{"sorcery_boost", "Sorcery Damage Boost"},
+	{"pentabreak_boost", "Pentabreak Damage Boost"},
+}
+
+func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]bool) []EffectSummary {
+	var summary []EffectSummary
+	for _, eff := range summaryEffects {
+		checker := effectCheckers[eff.Key]
+		if checker == nil {
+			continue
+		}
+		count := 0
+		for _, m := range members {
+			for _, sb := range m.SoulBreaks {
+				if loggedIn && !owned[sb.ID] {
+					continue
+				}
+				found := walkSBTexts(sb, sbTextWalkOptions{
+					IncludeStatuses: true,
+					IncludeBrave:    true,
+				}, checker)
+				if found {
+					count++
+				}
+			}
+		}
+		summary = append(summary, EffectSummary{
+			Key:   eff.Key,
+			Label: eff.Label,
+			Count: count,
+		})
+	}
+	return summary
 }
 
 func tierAPIHandler(w http.ResponseWriter, r *http.Request) {

@@ -204,11 +204,18 @@ type PartyMember struct {
 	SoulBreaks    []SoulBreak
 }
 
+type EffectSummary struct {
+	Key   string
+	Label string
+	Count int
+}
+
 type PartyData struct {
 	Members         []PartyMember
 	AllCharacters   []Character
 	LoggedIn        bool
 	OwnedSoulbreaks map[string]bool
+	EffectSummary   []EffectSummary
 }
 
 type SearchData struct {
