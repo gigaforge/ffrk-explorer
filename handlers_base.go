@@ -125,6 +125,7 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 	var summary []EffectSummary
 	for _, eff := range summaryEffects {
 		count := 0
+		var sources []EffectSource
 		for _, m := range members {
 			for _, sb := range m.SoulBreaks {
 				if loggedIn && !owned[sb.ID] {
@@ -145,13 +146,18 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 				}
 				if found {
 					count++
+					sources = append(sources, EffectSource{
+						Character: m.Character.Name,
+						SoulBreak: sb.Name,
+					})
 				}
 			}
 		}
 		summary = append(summary, EffectSummary{
-			Key:   eff.Key,
-			Label: eff.Label,
-			Count: count,
+			Key:     eff.Key,
+			Label:   eff.Label,
+			Count:   count,
+			Sources: sources,
 		})
 	}
 	return summary

@@ -73,6 +73,15 @@ body.hide-unowned .unowned + tr.sb-detail { display: none !important; }
 .summary-count { font-size: 12px; color: #4caf50; margin-left: 1px; }
 .summary-x { color: #e94560; font-size: 15px; min-width: 16px; }
 .summary-label { white-space: nowrap; }
+.summary-item { position: relative; cursor: default; }
+.summary-tooltip { display: none; position: absolute; bottom: calc(100% + 4px); left: 0; z-index: 100;
+                   background: #0f1a2e; border: 1px solid #0f3460; border-radius: 4px;
+                   padding: 6px 10px; min-width: 180px; max-width: 300px; width: max-content;
+                   box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events: none; }
+.summary-item:hover .summary-tooltip { display: block; }
+.summary-tooltip .tip-row { font-size: 13px; padding: 2px 0; white-space: nowrap; }
+.summary-tooltip .tip-char { color: #e94560; font-weight: bold; }
+.summary-tooltip .tip-sb { color: #aaa; }
 
 /* Expandable row styles */
 tr.sb-row { cursor: pointer; }
@@ -170,6 +179,11 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
     <div class="summary-item{{if gt .Count 0}} has-effect{{end}}">
       {{if gt .Count 0}}<span class="summary-check">&#10004;{{if gt .Count 1}}<span class="summary-count">x{{.Count}}</span>{{end}}</span>{{else}}<span class="summary-x">&#10008;</span>{{end}}
       <span class="summary-label">{{.Label}}</span>
+      {{if .Sources}}
+      <div class="summary-tooltip">
+        {{range .Sources}}<div class="tip-row"><span class="tip-char">{{.Character}}</span> <span class="tip-sb">{{.SoulBreak}}</span></div>{{end}}
+      </div>
+      {{end}}
     </div>
     {{end}}
   </div>

@@ -204,10 +204,16 @@ type PartyMember struct {
 	SoulBreaks    []SoulBreak
 }
 
+type EffectSource struct {
+	Character string
+	SoulBreak string
+}
+
 type EffectSummary struct {
-	Key   string
-	Label string
-	Count int
+	Key     string
+	Label   string
+	Count   int
+	Sources []EffectSource
 }
 
 type PartyData struct {
