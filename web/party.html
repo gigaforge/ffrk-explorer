@@ -23,7 +23,7 @@ h3 { color: #e94560; margin: 16px 0 8px; font-size: 1.1em; }
                padding: 30px; text-align: center; color: #888; font-size: 16px; }
 .empty-party a { color: #e94560; }
 .member { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
-          padding: 16px; margin-bottom: 20px; }
+          padding: 16px; margin-bottom: 20px; scroll-margin-top: 130px; }
 .member-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .member-header img { width: 64px; height: 64px; object-fit: contain; }
 .member-info { flex: 1; }
@@ -62,6 +62,14 @@ body.hide-unowned .unowned + tr.sb-detail { display: none !important; }
 .add-char-dropdown .char-option:hover, .add-char-dropdown .char-option.highlighted { background: #0f3460; color: #e94560; }
 .add-char-dropdown .char-option.in-party { color: #666; cursor: default; }
 .add-char-dropdown .no-results { padding: 8px 10px; color: #666; font-size: 13px; }
+
+/* Party nav bar */
+.party-nav { display: flex; justify-content: center; gap: 16px; background: #16213e; border: 1px solid #0f3460;
+             border-radius: 8px; padding: 8px 16px; margin-bottom: 20px; position: sticky; top: 56px; z-index: 40; }
+.party-nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none;
+               color: #e0e0e0; font-size: 14px; padding: 4px 8px; border-radius: 4px; transition: background 0.15s; }
+.party-nav a:hover { background: #0f3460; color: #e94560; }
+.party-nav a img { width: 32px; height: 32px; object-fit: contain; }
 
 /* Summary panel */
 .summary-panel { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
@@ -192,8 +200,12 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </div>
 {{end}}
 
+<div class="party-nav">
+  {{range .Members}}<a href="#member-{{.Character.ID}}">{{if .Character.Img}}<img src="{{.Character.Img}}" alt="{{.Character.Name}}">{{end}}{{.Character.Name}}</a>{{end}}
+</div>
+
 {{range .Members}}
-<div class="member" data-charid="{{.Character.ID}}">
+<div class="member" id="member-{{.Character.ID}}" data-charid="{{.Character.ID}}">
   <div class="member-header">
     {{if .Character.Img}}<img src="{{.Character.Img}}" alt="{{.Character.Name}}">{{end}}
     <div class="member-info">
