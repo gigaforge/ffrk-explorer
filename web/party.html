@@ -67,6 +67,7 @@ body.hide-unowned .unowned + tr.sb-detail { display: none !important; }
 .summary-panel { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
                  padding: 12px 16px; margin-bottom: 20px; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 16px; }
+.summary-separator { grid-column: 1 / -1; border-top: 1px solid #0f3460; margin: 4px 0; }
 .summary-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 14px; color: #888; }
 .summary-item.has-effect { color: #e0e0e0; }
 .summary-check { color: #4caf50; font-size: 15px; min-width: 16px; }
@@ -176,6 +177,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <div class="section-label">Party Effect Summary{{if .LoggedIn}} <span style="font-weight:normal;color:#888;font-size:12px;">(owned SBs only)</span>{{end}}</div>
   <div class="summary-grid">
     {{range .EffectSummary}}
+    {{if .Separator}}<div class="summary-separator"></div>{{end}}
     <div class="summary-item{{if gt .Count 0}} has-effect{{end}}">
       {{if gt .Count 0}}<span class="summary-check">&#10004;{{if gt .Count 1}}<span class="summary-count">x{{.Count}}</span>{{end}}</span>{{else}}<span class="summary-x">&#10008;</span>{{end}}
       <span class="summary-label">{{.Label}}</span>

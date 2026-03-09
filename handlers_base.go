@@ -176,10 +176,11 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 		}
 
 		summary = append(summary, EffectSummary{
-			Key:     eff.Key,
-			Label:   eff.Label,
-			Count:   count,
-			Sources: sources,
+			Key:       eff.Key,
+			Label:     eff.Label,
+			Count:     count,
+			Sources:   sources,
+			Separator: eff.Key == "bard_6",
 		})
 	}
 	return summary

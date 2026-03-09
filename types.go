@@ -210,10 +210,11 @@ type EffectSource struct {
 }
 
 type EffectSummary struct {
-	Key     string
-	Label   string
-	Count   int
-	Sources []EffectSource
+	Key       string
+	Label     string
+	Count     int
+	Sources   []EffectSource
+	Separator bool
 }
 
 type PartyData struct {
