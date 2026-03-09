@@ -24,6 +24,7 @@ type searchRequest struct {
 	Imperil           string
 	SchoolsParam      string
 	SchoolMode        string
+	EffectMode        string
 	OwnedOnly         bool
 	AdditionalEffects []string
 	SchoolReqs        []searchSchoolReq
@@ -50,6 +51,10 @@ func parseSearchRequest(r *http.Request) searchRequest {
 	}
 	if req.SchoolMode == "" {
 		req.SchoolMode = "and"
+	}
+	req.EffectMode = q.Get("effectmode")
+	if req.EffectMode == "" {
+		req.EffectMode = "or"
 	}
 	req.characterLower = strings.ToLower(req.Character)
 
@@ -184,7 +189,7 @@ func collectMatchingSoulBreaks(d *AppData, c Character, req searchRequest, owned
 		if req.Imperil != "" && !sbMatchesImperil(sb, req.Imperil) {
 			continue
 		}
-		if len(req.AdditionalEffects) > 0 && !sbMatchesAdditionalEffects(sb, req.AdditionalEffects) {
+		if len(req.AdditionalEffects) > 0 && !sbMatchesAdditionalEffects(sb, req.AdditionalEffects, req.EffectMode) {
 			continue
 		}
 
@@ -230,7 +235,7 @@ func collectMatchingHeroAbilities(d *AppData, c Character, req searchRequest, ma
 		if req.Imperil != "" && !textContainsImperil(ha.Effects, req.Imperil) {
 			continue
 		}
-		if len(req.AdditionalEffects) > 0 && !haMatchesAdditionalEffects(ha, req.AdditionalEffects) {
+		if len(req.AdditionalEffects) > 0 && !haMatchesAdditionalEffects(ha, req.AdditionalEffects, req.EffectMode) {
 			continue
 		}
 
@@ -290,7 +295,7 @@ func collectMatchingLegendMateria(d *AppData, c Character, req searchRequest, ow
 		if req.Imperil != "" && !textContainsImperil(lm.Effect, req.Imperil) {
 			continue
 		}
-		if len(req.AdditionalEffects) > 0 && !lmMatchesAdditionalEffects(lm, req.AdditionalEffects) {
+		if len(req.AdditionalEffects) > 0 && !lmMatchesAdditionalEffects(lm, req.AdditionalEffects, req.EffectMode) {
 			continue
 		}
 

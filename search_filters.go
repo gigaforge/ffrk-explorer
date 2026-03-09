@@ -218,26 +218,46 @@ func walkSBTexts(sb SoulBreak, opts sbTextWalkOptions, visit func(string) bool) 
 	return false
 }
 
-// sbMatchesAdditionalEffects checks if a soul break matches ALL of the given effect filters.
-func sbMatchesAdditionalEffects(sb SoulBreak, effects []string) bool {
+// sbMatchesAdditionalEffects checks if a soul break matches the given effect filters using the specified mode.
+func sbMatchesAdditionalEffects(sb SoulBreak, effects []string, mode string) bool {
+	if mode == "or" {
+		for _, eff := range effects {
+			checker, ok := effectCheckers[eff]
+			if !ok {
+				continue
+			}
+			if walkSBTexts(sb, sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}, checker) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, eff := range effects {
 		checker, ok := effectCheckers[eff]
 		if !ok {
 			continue
 		}
-		found := walkSBTexts(sb, sbTextWalkOptions{
-			IncludeStatuses: true,
-			IncludeBrave:    true,
-		}, checker)
-		if !found {
+		if !walkSBTexts(sb, sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}, checker) {
 			return false
 		}
 	}
 	return true
 }
 
-// lmMatchesAdditionalEffects checks if a legend materia matches ALL of the given effect filters.
-func lmMatchesAdditionalEffects(lm LegendMateria, effects []string) bool {
+// lmMatchesAdditionalEffects checks if a legend materia matches the given effect filters using the specified mode.
+func lmMatchesAdditionalEffects(lm LegendMateria, effects []string, mode string) bool {
+	if mode == "or" {
+		for _, eff := range effects {
+			checker, ok := effectCheckers[eff]
+			if !ok {
+				continue
+			}
+			if checker(lm.Effect) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, eff := range effects {
 		checker, ok := effectCheckers[eff]
 		if !ok {
@@ -250,8 +270,20 @@ func lmMatchesAdditionalEffects(lm LegendMateria, effects []string) bool {
 	return true
 }
 
-// haMatchesAdditionalEffects checks if a hero ability matches ALL of the given effect filters.
-func haMatchesAdditionalEffects(ha HeroAbility, effects []string) bool {
+// haMatchesAdditionalEffects checks if a hero ability matches the given effect filters using the specified mode.
+func haMatchesAdditionalEffects(ha HeroAbility, effects []string, mode string) bool {
+	if mode == "or" {
+		for _, eff := range effects {
+			checker, ok := effectCheckers[eff]
+			if !ok {
+				continue
+			}
+			if checker(ha.Effects) {
+				return true
+			}
+		}
+		return false
+	}
 	for _, eff := range effects {
 		checker, ok := effectCheckers[eff]
 		if !ok {

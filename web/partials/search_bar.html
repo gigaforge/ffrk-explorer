@@ -73,6 +73,11 @@
 <div class="modal-overlay" id="effects-modal">
   <div class="modal">
     <h3>Additional Effects</h3>
+    <div class="school-toggle">
+      <span>Match:</span>
+      <button id="effect-mode-or" class="active" onclick="setEffectMode('or')">ANY (OR)</button>
+      <button id="effect-mode-and" onclick="setEffectMode('and')">ALL (AND)</button>
+    </div>
     <div class="modal-columns">
       <div class="modal-col">
         <label><input type="checkbox" value="aegis_counter"> Aegis Counter</label>
@@ -226,6 +231,12 @@ function updateBadge(){
 document.getElementById('effects-modal').addEventListener('click',function(e){
   if(e.target===this)closeEffectsModal();
 });
+var effectMode='or';
+function setEffectMode(mode){
+  effectMode=mode;
+  document.getElementById('effect-mode-and').classList.toggle('active',mode==='and');
+  document.getElementById('effect-mode-or').classList.toggle('active',mode==='or');
+}
 var schoolMode='and';
 function openSchoolsModal(){document.getElementById('schools-modal').classList.add('visible')}
 function closeSchoolsModal(){document.getElementById('schools-modal').classList.remove('visible');updateSchoolsBadge()}
@@ -263,7 +274,7 @@ function doSearch(){
   var t=document.getElementById('tier-select').value;if(t)p.set('tier',t);
   var e=document.getElementById('en-element-select').value;if(e)p.set('element',e);
   var i=document.getElementById('imperil-select').value;if(i)p.set('imperil',i);
-  var eff=getCheckedEffects();if(eff.length>0)p.set('effects',eff.join(','));
+  var eff=getCheckedEffects();if(eff.length>0){p.set('effects',eff.join(','));if(effectMode!=='or')p.set('effectmode',effectMode)}
   var sch=getSchoolFilters();if(sch)p.set('schools',sch);
   if(schoolMode!=='and')p.set('schoolmode',schoolMode);
   if(document.getElementById('owned-only').checked)p.set('owned','1');
@@ -347,6 +358,7 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
     });
     updateSchoolsBadge();
   }
+  if(p.get('effectmode')==='and')setEffectMode('and');
   if(p.get('schoolmode')==='or')setSchoolMode('or');
 })();
 function goToParty(e){
