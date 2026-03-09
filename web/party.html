@@ -181,7 +181,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <span class="summary-label">{{.Label}}</span>
       {{if .Sources}}
       <div class="summary-tooltip">
-        {{range .Sources}}<div class="tip-row"><span class="tip-char">{{.Character}}</span> <span class="tip-sb">{{.SoulBreak}}</span></div>{{end}}
+        {{range .Sources}}<div class="tip-row"><span class="tip-char">{{.Character}}</span>{{if .SoulBreak}} <span class="tip-sb">{{.SoulBreak}}</span>{{end}}</div>{{end}}
       </div>
       {{end}}
     </div>

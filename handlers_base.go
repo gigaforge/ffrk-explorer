@@ -119,6 +119,15 @@ var summaryEffects = []struct {
 	{"phy_boost", "PHY Boost"},
 	{"sorcery_boost", "Sorcery Damage Boost"},
 	{"pentabreak_boost", "Pentabreak Damage Boost"},
+	{"bard_6", "6★ Bard Access"},
+	{"dancer_6", "6★ Dancer Access"},
+	{"support_6", "6★ Support Access"},
+}
+
+var schoolAccessEffects = map[string]string{
+	"bard_6":    "Bard",
+	"dancer_6":  "Dancer",
+	"support_6": "Support",
 }
 
 func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]bool) []EffectSummary {
@@ -126,33 +135,46 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 	for _, eff := range summaryEffects {
 		count := 0
 		var sources []EffectSource
-		for _, m := range members {
-			for _, sb := range m.SoulBreaks {
-				if loggedIn && !owned[sb.ID] {
-					continue
-				}
-				var found bool
-				if eff.Key == "proshellga" {
-					found = sbMatchesProshellga(sb)
-				} else {
-					checker := effectCheckers[eff.Key]
-					if checker == nil {
-						continue
-					}
-					found = walkSBTexts(sb, sbTextWalkOptions{
-						IncludeStatuses: true,
-						IncludeBrave:    true,
-					}, checker)
-				}
-				if found {
+
+		if school, ok := schoolAccessEffects[eff.Key]; ok {
+			for _, m := range members {
+				if m.Character.Schools[school] >= 6 {
 					count++
 					sources = append(sources, EffectSource{
 						Character: m.Character.Name,
-						SoulBreak: sb.Name,
 					})
 				}
 			}
+		} else {
+			for _, m := range members {
+				for _, sb := range m.SoulBreaks {
+					if loggedIn && !owned[sb.ID] {
+						continue
+					}
+					var found bool
+					if eff.Key == "proshellga" {
+						found = sbMatchesProshellga(sb)
+					} else {
+						checker := effectCheckers[eff.Key]
+						if checker == nil {
+							continue
+						}
+						found = walkSBTexts(sb, sbTextWalkOptions{
+							IncludeStatuses: true,
+							IncludeBrave:    true,
+						}, checker)
+					}
+					if found {
+						count++
+						sources = append(sources, EffectSource{
+							Character: m.Character.Name,
+							SoulBreak: sb.Name,
+						})
+					}
+				}
+			}
 		}
+
 		summary = append(summary, EffectSummary{
 			Key:     eff.Key,
 			Label:   eff.Label,
