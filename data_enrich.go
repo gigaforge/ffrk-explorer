@@ -16,6 +16,9 @@ import (
 var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
 var pctRe = regexp.MustCompile(`([+-])\d+%`)
 var forSecRe = regexp.MustCompile(`for (\d+(?:\.\d+)?) seconds`)
+var skippedUnbracketedStatusTerms = map[string]bool{
+	"Poison": true,
+}
 
 type statusTextMatch struct {
 	start int
@@ -190,6 +193,9 @@ func (d *AppData) matchAndBracketEffectsInText(text string) (string, []StatusEff
 
 	for _, term := range d.statusMatchTerms {
 		if term == "" {
+			continue
+		}
+		if skippedUnbracketedStatusTerms[term] {
 			continue
 		}
 		for off := 0; off < len(text); {
