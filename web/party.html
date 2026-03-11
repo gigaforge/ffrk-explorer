@@ -163,6 +163,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   padding: 2px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; }
 .sb-hide-btn:hover { border-color: #e94560; color: #e94560; }
 .sb-unhide-btn:hover { border-color: #4caf50; color: #4caf50; }
+.sb-hide-btn[disabled], .sb-unhide-btn[disabled] { opacity: 0.6; cursor: wait; }
 
 /* Hidden SBs collapsible section */
 .hidden-sbs-section { margin-top: 8px; }
@@ -264,7 +265,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 {{else}}
 
 {{if .EffectSummary}}
-<div class="summary-panel">
+<div class="summary-panel" id="party-summary-panel">
   <div class="section-label">Party Effect Summary{{if .LoggedIn}} <span style="font-weight:normal;color:#888;font-size:12px;">{{if .IsShared}}({{.OwnerName}}'s owned SBs){{else}}(owned SBs only){{end}}</span>{{end}}</div>
   <div class="summary-grid">
     {{range .EffectSummary}}
@@ -361,7 +362,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <td>{{.Element}}</td>
       <td>{{.Time}}</td>
       <td class="effects">{{.Effects}}</td>
-      <td>{{if not $.IsShared}}<button class="sb-hide-btn" onclick="hideSB('{{.ID}}');event.stopPropagation();">Hide</button>{{end}}</td>
+      <td>{{if not $.IsShared}}<button class="sb-hide-btn" onclick="hideSB('{{.ID}}', this);event.stopPropagation();">Hide</button>{{end}}</td>
     </tr>
     {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
     <tr class="sb-detail">
@@ -646,7 +647,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
           <td>{{.Element}}</td>
           <td>{{.Time}}</td>
           <td class="effects">{{.Effects}}</td>
-          <td>{{if not $.IsShared}}<button class="sb-unhide-btn" onclick="unhideSB('{{.ID}}');event.stopPropagation();">Unhide</button>{{end}}</td>
+          <td>{{if not $.IsShared}}<button class="sb-unhide-btn" onclick="unhideSB('{{.ID}}', this);event.stopPropagation();">Unhide</button>{{end}}</td>
         </tr>
         {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
         <tr class="sb-detail">
@@ -728,24 +729,88 @@ function getHiddenSBs(){
 function saveHiddenSBs(ids){
   localStorage.setItem('ffrk_party_hidden_sbs', JSON.stringify(ids));
 }
-function syncURL(){
-  var ids=getParty();
+function buildPartyURL(ids, hidden){
   var url='/party';
   if(ids.length>0) url+='?ids='+ids.join(',');
-  var hidden=getHiddenSBs();
   if(hidden.length>0) url+=(ids.length>0?'&':'?')+'hidden='+hidden.join(',');
-  window.location=url;
+  return url;
 }
-function hideSB(sbid){
-  var hidden=getHiddenSBs();
-  if(hidden.indexOf(sbid)===-1) hidden.push(sbid);
-  saveHiddenSBs(hidden);
-  syncURL();
+function syncURL(){
+  window.location=buildPartyURL(getParty(), getHiddenSBs());
 }
-function unhideSB(sbid){
-  var hidden=getHiddenSBs().filter(function(x){return x!==sbid});
-  saveHiddenSBs(hidden);
-  syncURL();
+function replaceSummaryPanel(doc){
+  var current=document.getElementById('party-summary-panel');
+  var next=doc.getElementById('party-summary-panel');
+  var nav=document.querySelector('.party-nav');
+  if(current&&next){current.replaceWith(next);return true;}
+  if(current&&!next){current.remove();return true;}
+  if(!current&&next&&nav&&nav.parentNode){nav.parentNode.insertBefore(next, nav);return true;}
+  return !current&&!next;
+}
+function replaceMemberFromHTML(html, charID){
+  var parser=new DOMParser();
+  var doc=parser.parseFromString(html,'text/html');
+  var current=document.querySelector('.member[data-charid="'+charID+'"]');
+  var next=doc.querySelector('.member[data-charid="'+charID+'"]');
+  if(!current||!next) return false;
+  var hiddenExpanded=false;
+  var currentToggle=current.querySelector('.hidden-sbs-toggle');
+  if(currentToggle&&currentToggle.classList.contains('expanded')) hiddenExpanded=true;
+  current.replaceWith(next);
+  replaceSummaryPanel(doc);
+  if(hiddenExpanded){
+    var nextToggle=next.querySelector('.hidden-sbs-toggle');
+    if(nextToggle&&!nextToggle.classList.contains('expanded')) toggleHiddenSBs(nextToggle);
+  }
+  return true;
+}
+var partyVisibilityReq=0;
+function updateHiddenSB(sbid, hidden, btn){
+  var ids=getParty();
+  if(ids.length===0) return;
+  var nextHidden=getHiddenSBs().filter(function(x){return x!==sbid});
+  if(hidden) nextHidden.push(sbid);
+  var member=btn&&btn.closest('.member');
+  var charID=member?member.getAttribute('data-charid'):'';
+  if(!charID){
+    saveHiddenSBs(nextHidden);
+    window.location=buildPartyURL(ids,nextHidden);
+    return;
+  }
+  if(btn) btn.disabled=true;
+  var reqID=++partyVisibilityReq;
+  fetch('/api/party/visibility',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({character_ids:ids,hidden_sbs:nextHidden,soulbreak_id:sbid,hidden:hidden})
+  })
+  .then(function(r){
+    if(!r.ok) throw new Error('request failed');
+    return r.json();
+  })
+  .then(function(data){
+    if(reqID!==partyVisibilityReq) return;
+    if(data.error) throw new Error(data.error);
+    var hiddenSBs=Array.isArray(data.hidden_sbs)?data.hidden_sbs:nextHidden;
+    saveHiddenSBs(hiddenSBs);
+    window.history.replaceState(null,'',buildPartyURL(ids,hiddenSBs));
+    if(!replaceMemberFromHTML(data.html||'', charID)) window.location=buildPartyURL(ids,hiddenSBs);
+  })
+  .catch(function(){
+    if(reqID!==partyVisibilityReq) return;
+    saveHiddenSBs(nextHidden);
+    window.location=buildPartyURL(ids,nextHidden);
+  })
+  .finally(function(){
+    if(reqID!==partyVisibilityReq) return;
+    if(btn) btn.disabled=false;
+  });
+}
+function hideSB(sbid, btn){
+  updateHiddenSB(sbid, true, btn);
+}
+function unhideSB(sbid, btn){
+  updateHiddenSB(sbid, false, btn);
 }
 function removeMember(id){
   var ids=getParty().filter(function(x){return x!==id});
@@ -770,10 +835,7 @@ function clearParty(){
   var expectedIds=ids.join(',');
   var expectedHidden=hidden.join(',');
   if(urlIds!==expectedIds||urlHidden!==expectedHidden){
-    var url='/party';
-    if(ids.length>0) url+='?ids='+ids.join(',');
-    if(hidden.length>0) url+=(ids.length>0?'&':'?')+'hidden='+hidden.join(',');
-    window.location.replace(url);
+    window.location.replace(buildPartyURL(ids, hidden));
   }
 })();
 function onAuthChange(){window.location.reload()}

@@ -31,6 +31,7 @@ func main() {
 	http.HandleFunc("/search", searchHandler)
 	http.HandleFunc("/party", partyHandler)
 	http.HandleFunc("/party/s/", sharedPartyHandler)
+	http.HandleFunc("/api/party/visibility", partyVisibilityHandler)
 	http.HandleFunc("/api/characters", characterAPIHandler)
 	http.HandleFunc("/api/tiers", tierAPIHandler)
 	http.HandleFunc("/api/login", loginHandler)
