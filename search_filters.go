@@ -210,6 +210,15 @@ func walkSBTexts(sb SoulBreak, opts sbTextWalkOptions, visit func(string) bool) 
 		}
 	}
 
+	for _, ta := range sb.TriggerAbilities {
+		if visit(ta.Effects) {
+			return true
+		}
+		if opts.IncludeStatuses && walkStatusEffectTexts(ta.MatchedEffects, visit) {
+			return true
+		}
+	}
+
 	if opts.IncludeBrave && sb.BraveCommand != nil {
 		for _, bl := range sb.BraveCommand.Levels {
 			if visit(bl.Effects) {
