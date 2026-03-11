@@ -690,6 +690,7 @@ func (d *AppData) matchLegendMateriaEffects() {
 
 func (d *AppData) loadStatuses() error {
 	d.StatusEffects = make(map[string]StatusEffect)
+	d.statusAliases = make(map[string]StatusEffect)
 	rows, err := d.readCSV("Status.csv")
 	if err != nil {
 		return err
@@ -705,9 +706,23 @@ func (d *AppData) loadStatuses() error {
 			Duration:    strings.TrimSpace(row["Default Duration"]),
 		}
 	}
-	d.statusMatchTerms = make([]string, 0, len(d.StatusEffects))
+	for name, se := range d.StatusEffects {
+		if strings.HasPrefix(name, "Imperil Prismatic") {
+			suffix := strings.TrimPrefix(name, "Imperil Prismatic")
+			d.statusAliases["Prismatic Imperil"+suffix] = se
+		}
+	}
+	d.statusAliases["Prismatic Imperil"] = StatusEffect{
+		Name:        "Imperil Prismatic",
+		Description: "Lowers Fire, Ice, Lightning, Earth, Wind, Water, Holy, Dark, and Poison resistance.",
+	}
+
+	d.statusMatchTerms = make([]string, 0, len(d.StatusEffects)+len(d.statusAliases))
 	for name := range d.StatusEffects {
 		d.statusMatchTerms = append(d.statusMatchTerms, name)
+	}
+	for alias := range d.statusAliases {
+		d.statusMatchTerms = append(d.statusMatchTerms, alias)
 	}
 	sort.Slice(d.statusMatchTerms, func(i, j int) bool {
 		if len(d.statusMatchTerms[i]) != len(d.statusMatchTerms[j]) {

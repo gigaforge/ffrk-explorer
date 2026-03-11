@@ -64,3 +64,48 @@ func TestMatchAndBracketEffectsInTextKeepsBracketedPoison(t *testing.T) {
 		t.Fatalf("unexpected matched effects: %#v", matched)
 	}
 }
+
+func TestMatchAndBracketEffectsInTextMatchesPrismaticImperilAlias(t *testing.T) {
+	d := &AppData{
+		StatusEffects: map[string]StatusEffect{
+			"Imperil Prismatic 10% (5s)": {
+				Name:        "Imperil Prismatic 10% (5s)",
+				Description: "Lowers all elemental resistance by 10%.",
+				Duration:    "5 seconds",
+			},
+		},
+		statusAliases: map[string]StatusEffect{
+			"Prismatic Imperil": {
+				Name:        "Imperil Prismatic",
+				Description: "Lowers Fire, Ice, Lightning, Earth, Wind, Water, Holy, Dark, and Poison resistance.",
+			},
+			"Prismatic Imperil 10% (5s)": {
+				Name:        "Imperil Prismatic 10% (5s)",
+				Description: "Lowers all elemental resistance by 10%.",
+				Duration:    "5 seconds",
+			},
+		},
+		statusMatchTerms: []string{"Prismatic Imperil 10% (5s)", "Prismatic Imperil"},
+	}
+
+	text, matched := d.matchAndBracketEffectsInText("Chases with minor Prismatic Imperil for 5 seconds and later causes Prismatic Imperil 10% (5s).")
+	if text != "Chases with minor [Prismatic Imperil] for 5 seconds and later causes [Prismatic Imperil 10% (5s)]." {
+		t.Fatalf("unexpected bracketed text: %q", text)
+	}
+
+	want := []StatusEffect{
+		{
+			Name:        "Imperil Prismatic",
+			Description: "Lowers Fire, Ice, Lightning, Earth, Wind, Water, Holy, Dark, and Poison resistance.",
+			Duration:    "5 seconds",
+		},
+		{
+			Name:        "Imperil Prismatic 10% (5s)",
+			Description: "Lowers all elemental resistance by 10%.",
+			Duration:    "5 seconds",
+		},
+	}
+	if !reflect.DeepEqual(matched, want) {
+		t.Fatalf("unexpected matched effects: %#v", matched)
+	}
+}

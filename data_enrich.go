@@ -32,6 +32,9 @@ func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
 	if se, ok := d.StatusEffects[term]; ok {
 		return se, true
 	}
+	if se, ok := d.statusAliases[term]; ok {
+		return se, true
+	}
 	// Fallback: replace specific percentages (+30%, -50%) with +X%/-X%
 	generic := pctRe.ReplaceAllString(term, "${1}X%")
 	if generic != term {
@@ -45,6 +48,11 @@ func (d *AppData) lookupStatus(term string) (StatusEffect, bool) {
 			for _, actual := range actuals {
 				result.Description = strings.Replace(result.Description, string(actual[0])+"X%", actual, 1)
 			}
+			return result, true
+		}
+		if se, ok := d.statusAliases[generic]; ok {
+			result := se
+			result.Name = term
 			return result, true
 		}
 	}

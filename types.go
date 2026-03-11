@@ -174,6 +174,7 @@ type AppData struct {
 	TriggerAbilities map[string][]TriggerAbility // sbName → []TriggerAbility
 	LegendMateria    map[string][]LegendMateria  // character → []LegendMateria
 	StatusEffects    map[string]StatusEffect
+	statusAliases    map[string]StatusEffect
 	statusMatchTerms []string
 	RealmGroups      []RealmGroup
 	CharByID         map[string]*Character
