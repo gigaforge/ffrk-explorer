@@ -328,13 +328,13 @@ func textContainsAttach(text, element string) bool {
 	return containsCI(text, "Attach "+element) || containsCI(text, "En-"+element)
 }
 
-// textContainsImperil checks if text contains "Imperil <element>" or "Imperil Prismatic"
+// textContainsImperil checks if text contains "Imperil <element>" or either prismatic phrasing.
 func textContainsImperil(text, element string) bool {
 	if containsCI(text, "Imperil "+element) {
 		return true
 	}
-	// "Imperil Prismatic" matches any specific element
-	if element != "Prismatic" && containsCI(text, "Imperil Prismatic") {
+	// Prismatic imperil matches any specific element filter, including Poison.
+	if element != "Prismatic" && (containsCI(text, "Imperil Prismatic") || containsCI(text, "Prismatic Imperil")) {
 		return true
 	}
 	return false
