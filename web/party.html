@@ -186,26 +186,24 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 </div>
 {{end}}
 
+{{if not .IsShared}}
 <div class="party-header">
   <h1>Party Builder</h1>
-  {{if not .IsShared}}
   <div class="add-char-wrap">
     <input type="text" class="add-char-input" id="add-char-input" placeholder="Add character..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="add-char-dropdown" id="add-char-dropdown"></div>
   </div>
-  {{end}}
-  {{if or (and .IsShared .ViewerLoggedIn) (and (not .IsShared) .LoggedIn)}}
+  {{if .LoggedIn}}
   <label class="owned-toggle"><input type="checkbox" id="show-unowned" onchange="toggleUnowned(this.checked)"> Show unowned SBs</label>
   {{end}}
-  {{if not .IsShared}}
   {{if .Members}}
   <button class="clear-party-btn" onclick="clearParty()">Clear Party</button>
   {{end}}
   {{if .LoggedIn}}
   <button class="clear-party-btn" onclick="openPartiesModal()">My Parties</button>
   {{end}}
-  {{end}}
 </div>
+{{end}}
 
 {{if and (not .IsShared) .Members}}
 <div class="party-actions">
@@ -633,7 +631,7 @@ function toggleUnowned(show){
   else{document.body.classList.add('hide-unowned')}
   localStorage.setItem('ffrk_party_show_unowned',show?'1':'0');
 }
-{{if or (and .IsShared .ViewerLoggedIn) (and (not .IsShared) .LoggedIn)}}
+{{if and (not .IsShared) .LoggedIn}}
 (function(){
   var pref=localStorage.getItem('ffrk_party_show_unowned');
   var show=pref==='1';
