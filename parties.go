@@ -128,6 +128,7 @@ func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		ID           string   `json:"id"`
 		Name         string   `json:"name"`
 		CharacterIDs []string `json:"character_ids"`
+		HiddenSBs    []string `json:"hidden_sbs"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -175,6 +176,7 @@ func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
 			if p.ID == req.ID {
 				p.Name = name
 				p.CharacterIDs = req.CharacterIDs
+				p.HiddenSBs = req.HiddenSBs
 				resultID = p.ID
 				found = true
 				break
@@ -201,6 +203,7 @@ func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
 			Name:         name,
 			CharacterIDs: req.CharacterIDs,
 			ShareKey:     shareKey,
+			HiddenSBs:    req.HiddenSBs,
 		}
 		parties = append(parties, p)
 		userParties[u.ID] = parties
@@ -318,6 +321,11 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 
 	owned := snapshotOwnedSoulbreaks(ownerUID)
 
+	hiddenSBs := make(map[string]bool)
+	for _, id := range party.HiddenSBs {
+		hiddenSBs[id] = true
+	}
+
 	data := PartyData{
 		Members:         members,
 		AllCharacters:   sorted,
@@ -326,6 +334,7 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 		IsShared:        true,
 		OwnerName:       ownerUser.Username,
 		PartyName:       party.Name,
+		HiddenSBs:       hiddenSBs,
 	}
 
 	viewer := getCurrentUser(r)
@@ -335,7 +344,7 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(members) > 0 {
-		data.EffectSummary = buildEffectSummary(members, true, owned)
+		data.EffectSummary = buildEffectSummary(members, true, owned, hiddenSBs)
 	}
 
 	partyTmpl.Execute(w, data)

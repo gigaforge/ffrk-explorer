@@ -80,11 +80,21 @@ func partyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	hiddenSBs := make(map[string]bool)
+	if hp := r.URL.Query().Get("hidden"); hp != "" {
+		for _, id := range strings.Split(hp, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				hiddenSBs[id] = true
+			}
+		}
+	}
+
 	sorted := make([]Character, len(d.Characters))
 	copy(sorted, d.Characters)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
-	data := PartyData{Members: members, AllCharacters: sorted}
+	data := PartyData{Members: members, AllCharacters: sorted, HiddenSBs: hiddenSBs}
 	u := getCurrentUser(r)
 	if u != nil {
 		data.LoggedIn = true
@@ -94,7 +104,7 @@ func partyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(members) > 0 {
-		data.EffectSummary = buildEffectSummary(members, data.LoggedIn, data.OwnedSoulbreaks)
+		data.EffectSummary = buildEffectSummary(members, data.LoggedIn, data.OwnedSoulbreaks, hiddenSBs)
 	}
 
 	partyTmpl.Execute(w, data)
@@ -130,7 +140,7 @@ var schoolAccessEffects = map[string]string{
 	"support_6": "Support",
 }
 
-func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]bool) []EffectSummary {
+func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]bool, hiddenSBs map[string]bool) []EffectSummary {
 	var summary []EffectSummary
 	for _, eff := range summaryEffects {
 		count := 0
@@ -149,6 +159,9 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 			for _, m := range members {
 				for _, sb := range m.SoulBreaks {
 					if loggedIn && !owned[sb.ID] {
+						continue
+					}
+					if hiddenSBs[sb.ID] {
 						continue
 					}
 					var found bool

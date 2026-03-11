@@ -158,6 +158,23 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .party-row-actions button.danger { color: #ff6b6b; }
 .party-row-actions button.danger:hover { background: #2a1a1a; }
 
+/* Hide/Unhide SB buttons */
+.sb-hide-btn, .sb-unhide-btn { background: none; border: 1px solid #444; color: #888; border-radius: 4px;
+  padding: 2px 8px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.sb-hide-btn:hover { border-color: #e94560; color: #e94560; }
+.sb-unhide-btn:hover { border-color: #4caf50; color: #4caf50; }
+
+/* Hidden SBs collapsible section */
+.hidden-sbs-section { margin-top: 8px; }
+.hidden-sbs-toggle { background: none; border: 1px solid #333; color: #888; border-radius: 4px;
+  padding: 4px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.hidden-sbs-toggle:hover { border-color: #666; color: #aaa; }
+.hidden-sbs-toggle .chevron { display: inline-block; font-size: 11px; transition: transform 0.2s; }
+.hidden-sbs-toggle.expanded .chevron { transform: rotate(90deg); }
+.hidden-sbs-content { display: none; }
+.hidden-sbs-content.visible { display: block; }
+.hidden-sbs-content table { opacity: 0.5; }
+
 @media (max-width: 768px) {
   body { padding-left: 12px; padding-right: 12px; }
   .member { padding: 12px; }
@@ -332,9 +349,10 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   {{if .SoulBreaks}}
   <div class="section-label">Soul Breaks</div>
   <table>
-    <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+    <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th><th></th></tr>
     {{range .SoulBreaks}}
-    <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}{{if and $.IsShared $.ViewerLoggedIn (not (index $.ViewerOwnedSoulbreaks .ID))}} viewer-unowned{{end}}" onclick="toggleDetail(this)">
+    {{if not (index $.HiddenSBs .ID)}}
+    <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}{{if and $.IsShared $.ViewerLoggedIn (not (index $.ViewerOwnedSoulbreaks .ID))}} viewer-unowned{{end}}" onclick="toggleDetail(this)" data-sbid="{{.ID}}">
       <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
       <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
@@ -343,10 +361,11 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <td>{{.Element}}</td>
       <td>{{.Time}}</td>
       <td class="effects">{{.Effects}}</td>
+      <td>{{if not $.IsShared}}<button class="sb-hide-btn" onclick="hideSB('{{.ID}}');event.stopPropagation();">Hide</button>{{end}}</td>
     </tr>
     {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
     <tr class="sb-detail">
-      <td colspan="8">
+      <td colspan="9">
         {{if .BraveCommand}}
         <div class="burst-commands">
           <div class="burst-title">Brave Command: {{.BraveCommand.Name}}</div>
@@ -604,8 +623,54 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       </td>
     </tr>
     {{end}}
-    {{end}}
+    {{end}}{{/* if not hidden */}}
+    {{end}}{{/* range .SoulBreaks */}}
   </table>
+  {{$charID := .Character.ID}}
+  {{$hasHidden := false}}
+  {{range .SoulBreaks}}{{if index $.HiddenSBs .ID}}{{$hasHidden = true}}{{end}}{{end}}
+  {{if $hasHidden}}
+  <div class="hidden-sbs-section">
+    <button class="hidden-sbs-toggle" onclick="toggleHiddenSBs(this)"><span class="chevron">&#9654;</span> Hidden Soul Breaks</button>
+    <div class="hidden-sbs-content">
+      <table>
+        <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th><th></th></tr>
+        {{range .SoulBreaks}}
+        {{if index $.HiddenSBs .ID}}
+        <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}{{if and $.IsShared $.ViewerLoggedIn (not (index $.ViewerOwnedSoulbreaks .ID))}} viewer-unowned{{end}}" onclick="toggleDetail(this)" data-sbid="{{.ID}}">
+          <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
+          <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
+          <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
+          <td>{{.Tier}}</td>
+          <td>{{.Type}}</td>
+          <td>{{.Element}}</td>
+          <td>{{.Time}}</td>
+          <td class="effects">{{.Effects}}</td>
+          <td>{{if not $.IsShared}}<button class="sb-unhide-btn" onclick="unhideSB('{{.ID}}');event.stopPropagation();">Unhide</button>{{end}}</td>
+        </tr>
+        {{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}
+        <tr class="sb-detail">
+          <td colspan="9">
+            {{if .MatchedEffects}}
+            <ul class="effect-list">
+            {{range .MatchedEffects}}
+              <li>
+                <span class="effect-name">{{.Name}}</span>
+                {{if and .Duration (ne .Duration "-")}}<span class="effect-duration">({{.Duration}})</span>{{end}}
+                <span class="effect-desc">{{.Description}}</span>
+              </li>
+            {{end}}
+            </ul>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+        {{end}}{{/* if hidden */}}
+        {{end}}{{/* range .SoulBreaks */}}
+      </table>
+    </div>
+  </div>
+  {{end}}
   {{end}}
 </div>
 {{end}}
@@ -624,6 +689,11 @@ function toggleBcDetail(row) {
   row.classList.toggle('expanded');
   detail.classList.toggle('visible');
   event.stopPropagation();
+}
+function toggleHiddenSBs(btn) {
+  btn.classList.toggle('expanded');
+  var content = btn.nextElementSibling;
+  if (content) content.classList.toggle('visible');
 }
 
 // --- Owned toggle ---
@@ -652,11 +722,30 @@ function getParty(){
 function saveParty(ids){
   localStorage.setItem('ffrk_party', JSON.stringify(ids));
 }
+function getHiddenSBs(){
+  try { return JSON.parse(localStorage.getItem('ffrk_party_hidden_sbs'))||[]; } catch(e){ return []; }
+}
+function saveHiddenSBs(ids){
+  localStorage.setItem('ffrk_party_hidden_sbs', JSON.stringify(ids));
+}
 function syncURL(){
   var ids=getParty();
   var url='/party';
   if(ids.length>0) url+='?ids='+ids.join(',');
+  var hidden=getHiddenSBs();
+  if(hidden.length>0) url+=(ids.length>0?'&':'?')+'hidden='+hidden.join(',');
   window.location=url;
+}
+function hideSB(sbid){
+  var hidden=getHiddenSBs();
+  if(hidden.indexOf(sbid)===-1) hidden.push(sbid);
+  saveHiddenSBs(hidden);
+  syncURL();
+}
+function unhideSB(sbid){
+  var hidden=getHiddenSBs().filter(function(x){return x!==sbid});
+  saveHiddenSBs(hidden);
+  syncURL();
 }
 function removeMember(id){
   var ids=getParty().filter(function(x){return x!==id});
@@ -665,6 +754,7 @@ function removeMember(id){
 }
 function clearParty(){
   saveParty([]);
+  saveHiddenSBs([]);
   localStorage.removeItem('ffrk_party_name');
   localStorage.removeItem('ffrk_party_saved_id');
   localStorage.removeItem('ffrk_party_share_key');
@@ -673,12 +763,16 @@ function clearParty(){
 // On load, check if URL matches localStorage and redirect if needed
 (function(){
   var ids=getParty();
+  var hidden=getHiddenSBs();
   var params=new URLSearchParams(window.location.search);
   var urlIds=params.get('ids')||'';
-  var expected=ids.join(',');
-  if(urlIds!==expected){
+  var urlHidden=params.get('hidden')||'';
+  var expectedIds=ids.join(',');
+  var expectedHidden=hidden.join(',');
+  if(urlIds!==expectedIds||urlHidden!==expectedHidden){
     var url='/party';
     if(ids.length>0) url+='?ids='+ids.join(',');
+    if(hidden.length>0) url+=(ids.length>0?'&':'?')+'hidden='+hidden.join(',');
     window.location.replace(url);
   }
 })();
@@ -701,7 +795,8 @@ function savePartyToServer(){
   var nameInput=document.getElementById('party-name-input');
   var name=nameInput?nameInput.value.trim():'';
   var savedId=localStorage.getItem('ffrk_party_saved_id')||'';
-  var body={name:name,character_ids:ids};
+  var hidden=getHiddenSBs();
+  var body={name:name,character_ids:ids,hidden_sbs:hidden};
   if(savedId) body.id=savedId;
   fetch('/api/user/parties',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
   .then(function(r){return r.json()}).then(function(p){
@@ -752,6 +847,7 @@ function openPartiesModal(){
       loadBtn.textContent='Load';
       loadBtn.onclick=function(){
         saveParty(p.character_ids);
+        saveHiddenSBs(p.hidden_sbs||[]);
         localStorage.setItem('ffrk_party_name',p.name);
         localStorage.setItem('ffrk_party_saved_id',p.id);
         localStorage.setItem('ffrk_party_share_key',p.share_key);

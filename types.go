@@ -229,6 +229,7 @@ type PartyData struct {
 	PartyName            string
 	ViewerLoggedIn       bool
 	ViewerOwnedSoulbreaks map[string]bool
+	HiddenSBs            map[string]bool
 }
 
 type SavedParty struct {
@@ -236,6 +237,7 @@ type SavedParty struct {
 	Name         string   `json:"name"`
 	CharacterIDs []string `json:"character_ids"`
 	ShareKey     string   `json:"share_key"`
+	HiddenSBs    []string `json:"hidden_sbs,omitempty"`
 }
 
 type SearchData struct {
