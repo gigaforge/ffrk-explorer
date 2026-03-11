@@ -219,14 +219,16 @@ type EffectSummary struct {
 }
 
 type PartyData struct {
-	Members         []PartyMember
-	AllCharacters   []Character
-	LoggedIn        bool
-	OwnedSoulbreaks map[string]bool
-	EffectSummary   []EffectSummary
-	IsShared        bool
-	OwnerName       string
-	PartyName       string
+	Members              []PartyMember
+	AllCharacters        []Character
+	LoggedIn             bool
+	OwnedSoulbreaks      map[string]bool
+	EffectSummary        []EffectSummary
+	IsShared             bool
+	OwnerName            string
+	PartyName            string
+	ViewerLoggedIn       bool
+	ViewerOwnedSoulbreaks map[string]bool
 }
 
 type SavedParty struct {

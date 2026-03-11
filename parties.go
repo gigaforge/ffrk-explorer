@@ -328,6 +328,12 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 		PartyName:       party.Name,
 	}
 
+	viewer := getCurrentUser(r)
+	if viewer != nil {
+		data.ViewerLoggedIn = true
+		data.ViewerOwnedSoulbreaks = snapshotOwnedSoulbreaks(viewer.ID)
+	}
+
 	if len(members) > 0 {
 		data.EffectSummary = buildEffectSummary(members, true, owned)
 	}

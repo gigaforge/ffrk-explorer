@@ -194,7 +194,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
     <div class="add-char-dropdown" id="add-char-dropdown"></div>
   </div>
   {{end}}
-  {{if .LoggedIn}}
+  {{if or (and .IsShared .ViewerLoggedIn) (and (not .IsShared) .LoggedIn)}}
   <label class="owned-toggle"><input type="checkbox" id="show-unowned" onchange="toggleUnowned(this.checked)"> Show unowned SBs</label>
   {{end}}
   {{if not .IsShared}}
@@ -335,7 +335,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <table>
     <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Element</th><th>Time</th><th>Effects</th></tr>
     {{range .SoulBreaks}}
-    <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}" onclick="toggleDetail(this)">
+    <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}{{if $.IsShared}}{{if and $.ViewerLoggedIn (not (index $.ViewerOwnedSoulbreaks .ID))}} unowned{{end}}{{else}}{{if and $.LoggedIn (not (index $.OwnedSoulbreaks .ID))}} unowned{{end}}{{end}}" onclick="toggleDetail(this)">
       <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
       <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
@@ -633,7 +633,7 @@ function toggleUnowned(show){
   else{document.body.classList.add('hide-unowned')}
   localStorage.setItem('ffrk_party_show_unowned',show?'1':'0');
 }
-{{if .LoggedIn}}
+{{if or (and .IsShared .ViewerLoggedIn) (and (not .IsShared) .LoggedIn)}}
 (function(){
   var pref=localStorage.getItem('ffrk_party_show_unowned');
   var show=pref==='1';
