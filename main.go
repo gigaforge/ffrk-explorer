@@ -21,6 +21,7 @@ func main() {
 
 	log.Println("Loading user data...")
 	initUserData()
+	initPartyData()
 
 	go runCSVAutoUpdateLoop()
 
@@ -29,6 +30,7 @@ func main() {
 	http.HandleFunc("/char/", charHandler)
 	http.HandleFunc("/search", searchHandler)
 	http.HandleFunc("/party", partyHandler)
+	http.HandleFunc("/party/s/", sharedPartyHandler)
 	http.HandleFunc("/api/characters", characterAPIHandler)
 	http.HandleFunc("/api/tiers", tierAPIHandler)
 	http.HandleFunc("/api/login", loginHandler)
@@ -36,6 +38,7 @@ func main() {
 	http.HandleFunc("/api/logout", logoutHandler)
 	http.HandleFunc("/api/me", meHandler)
 	http.HandleFunc("/api/user/soulbreaks", userSoulbreaksHandler)
+	http.HandleFunc("/api/user/parties", userPartiesHandler)
 	http.HandleFunc("/ffrk_sync.php", syncHandler)
 
 	addr := "0.0.0.0:9090"

@@ -128,6 +128,35 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 .brave-icon-wrap .brave-bg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 .brave-icon-wrap .brave-fg { width: 32px; height: 32px; object-fit: contain; position: absolute; top: 0; left: 0; }
 
+/* Party name & actions */
+.party-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.party-name-input { background: #1a1a2e; color: #e0e0e0; border: 1px solid #0f3460; border-radius: 4px;
+                    padding: 6px 10px; font-size: 14px; width: 260px; }
+.party-name-input:focus { outline: none; border-color: #e94560; }
+.party-name-input::placeholder { color: #666; }
+.party-action-btn { background: #16213e; color: #e94560; border: 1px solid #e94560; border-radius: 4px;
+                    padding: 6px 14px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+.party-action-btn:hover { background: #e94560; color: #fff; }
+
+/* Shared party banner */
+.shared-banner { background: #16213e; border: 1px solid #0f3460; border-radius: 8px;
+                 padding: 12px 16px; margin-bottom: 16px; text-align: center; }
+.shared-party-name { font-size: 1.2em; font-weight: bold; color: #e94560; }
+.shared-by { color: #888; font-size: 14px; margin-top: 4px; }
+
+/* My Parties modal rows */
+.party-row { display: flex; justify-content: space-between; align-items: center;
+             padding: 8px 12px; border-bottom: 1px solid #0f3460; }
+.party-row:last-child { border-bottom: none; }
+.party-row-name { flex: 1; color: #e0e0e0; font-size: 14px; overflow: hidden; text-overflow: ellipsis;
+                  white-space: nowrap; margin-right: 8px; }
+.party-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.party-row-actions button { background: #16213e; color: #e94560; border: 1px solid #0f3460; border-radius: 4px;
+                            padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.party-row-actions button:hover { background: #0f3460; }
+.party-row-actions button.danger { color: #ff6b6b; }
+.party-row-actions button.danger:hover { background: #2a1a1a; }
+
 @media (max-width: 768px) {
   body { padding-left: 12px; padding-right: 12px; }
   .member { padding: 12px; }
@@ -150,19 +179,45 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 {{template "search_bar" .}}
 <a class="back" href="/" style="display:inline-block;margin-bottom:16px;">← All Characters</a>
 
+{{if .IsShared}}
+<div class="shared-banner">
+  {{if .PartyName}}<div class="shared-party-name">{{.PartyName}}</div>{{end}}
+  <div class="shared-by">Shared by {{.OwnerName}}</div>
+</div>
+{{end}}
+
 <div class="party-header">
   <h1>Party Builder</h1>
+  {{if not .IsShared}}
   <div class="add-char-wrap">
     <input type="text" class="add-char-input" id="add-char-input" placeholder="Add character..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="add-char-dropdown" id="add-char-dropdown"></div>
   </div>
+  {{end}}
   {{if .LoggedIn}}
   <label class="owned-toggle"><input type="checkbox" id="show-unowned" onchange="toggleUnowned(this.checked)"> Show unowned SBs</label>
   {{end}}
+  {{if not .IsShared}}
   {{if .Members}}
   <button class="clear-party-btn" onclick="clearParty()">Clear Party</button>
   {{end}}
+  {{if .LoggedIn}}
+  <button class="clear-party-btn" onclick="openPartiesModal()">My Parties</button>
+  {{end}}
+  {{end}}
 </div>
+
+{{if and (not .IsShared) .Members}}
+<div class="party-actions">
+  <input type="text" class="party-name-input" id="party-name-input" placeholder="Party name (optional)" maxlength="60">
+  {{if .LoggedIn}}
+  <button class="party-action-btn" id="save-party-btn" onclick="savePartyToServer()">Save Party</button>
+  <button class="party-action-btn" id="share-party-btn" onclick="shareCurrentParty()" style="display:none">Share</button>
+  {{end}}
+</div>
+{{end}}
+
+{{if not .IsShared}}
 <div class="auth-modal-overlay" id="replace-modal">
   <div class="auth-modal" style="max-width:340px;">
     <h3>Party Full</h3>
@@ -173,16 +228,28 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
     </div>
   </div>
 </div>
+<div class="auth-modal-overlay" id="parties-modal">
+  <div class="auth-modal" style="max-width:500px;">
+    <h3>My Parties</h3>
+    <div id="parties-list"></div>
+    <div class="modal-buttons" style="margin-top:12px;">
+      <button class="secondary" onclick="closePartiesModal()">Close</button>
+    </div>
+  </div>
+</div>
+{{end}}
 
 {{if not .Members}}
+{{if not .IsShared}}
 <div class="empty-party">
   Your party is empty. Type a character name above or visit a <a href="/">character's page</a> and click "Add to Party" to get started.
 </div>
+{{end}}
 {{else}}
 
 {{if .EffectSummary}}
 <div class="summary-panel">
-  <div class="section-label">Party Effect Summary{{if .LoggedIn}} <span style="font-weight:normal;color:#888;font-size:12px;">(owned SBs only)</span>{{end}}</div>
+  <div class="section-label">Party Effect Summary{{if .LoggedIn}} <span style="font-weight:normal;color:#888;font-size:12px;">{{if .IsShared}}({{.OwnerName}}'s owned SBs){{else}}(owned SBs only){{end}}</span>{{end}}</div>
   <div class="summary-grid">
     {{range .EffectSummary}}
     {{if .Separator}}<div class="summary-separator"></div>{{end}}
@@ -212,7 +279,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <div class="name"><a href="/char/{{.Character.ID}}">{{.Character.Name}}</a></div>
       <div class="realm">{{.Character.Realm}}</div>
     </div>
-    <button class="remove-btn" onclick="removeMember('{{.Character.ID}}')">Remove</button>
+    {{if not $.IsShared}}<button class="remove-btn" onclick="removeMember('{{.Character.ID}}')">Remove</button>{{end}}
   </div>
 
   {{if .HeroAbilities}}
@@ -559,6 +626,26 @@ function toggleBcDetail(row) {
   detail.classList.toggle('visible');
   event.stopPropagation();
 }
+
+// --- Owned toggle ---
+function toggleUnowned(show){
+  if(show){document.body.classList.remove('hide-unowned')}
+  else{document.body.classList.add('hide-unowned')}
+  localStorage.setItem('ffrk_party_show_unowned',show?'1':'0');
+}
+{{if .LoggedIn}}
+(function(){
+  var pref=localStorage.getItem('ffrk_party_show_unowned');
+  var show=pref==='1';
+  if(!show){document.body.classList.add('hide-unowned')}
+  var cb=document.getElementById('show-unowned');
+  if(cb)cb.checked=show;
+})();
+{{end}}
+
+{{if .IsShared}}
+function onAuthChange(){}
+{{else}}
 function getParty(){
   try { return JSON.parse(localStorage.getItem('ffrk_party'))||[]; } catch(e){ return []; }
 }
@@ -578,6 +665,9 @@ function removeMember(id){
 }
 function clearParty(){
   saveParty([]);
+  localStorage.removeItem('ffrk_party_name');
+  localStorage.removeItem('ffrk_party_saved_id');
+  localStorage.removeItem('ffrk_party_share_key');
   syncURL();
 }
 // On load, check if URL matches localStorage and redirect if needed
@@ -594,20 +684,120 @@ function clearParty(){
 })();
 function onAuthChange(){window.location.reload()}
 
-// --- Owned toggle ---
-function toggleUnowned(show){
-  if(show){document.body.classList.remove('hide-unowned')}
-  else{document.body.classList.add('hide-unowned')}
-  localStorage.setItem('ffrk_party_show_unowned',show?'1':'0');
-}
-{{if .LoggedIn}}
+// --- Party name init ---
 (function(){
-  var pref=localStorage.getItem('ffrk_party_show_unowned');
-  var show=pref==='1';
-  if(!show){document.body.classList.add('hide-unowned')}
-  var cb=document.getElementById('show-unowned');
-  if(cb)cb.checked=show;
+  var nameInput=document.getElementById('party-name-input');
+  if(nameInput){
+    nameInput.value=localStorage.getItem('ffrk_party_name')||'';
+    nameInput.addEventListener('input',function(){localStorage.setItem('ffrk_party_name',this.value)});
+  }
 })();
+
+// --- Save/Load/Share ---
+{{if .LoggedIn}}
+function savePartyToServer(){
+  var ids=getParty();
+  if(ids.length===0) return;
+  var nameInput=document.getElementById('party-name-input');
+  var name=nameInput?nameInput.value.trim():'';
+  var savedId=localStorage.getItem('ffrk_party_saved_id')||'';
+  var body={name:name,character_ids:ids};
+  if(savedId) body.id=savedId;
+  fetch('/api/user/parties',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+  .then(function(r){return r.json()}).then(function(p){
+    if(p.error){alert(p.error);return}
+    localStorage.setItem('ffrk_party_saved_id',p.id);
+    localStorage.setItem('ffrk_party_share_key',p.share_key);
+    localStorage.setItem('ffrk_party_name',p.name);
+    if(nameInput)nameInput.value=p.name;
+    updateShareButton();
+    var btn=document.getElementById('save-party-btn');
+    if(btn){btn.textContent='Saved!';setTimeout(function(){btn.textContent='Save Party'},2000)}
+  });
+}
+function updateShareButton(){
+  var shareKey=localStorage.getItem('ffrk_party_share_key');
+  var btn=document.getElementById('share-party-btn');
+  if(btn) btn.style.display=shareKey?'':'none';
+}
+function shareCurrentParty(){
+  var shareKey=localStorage.getItem('ffrk_party_share_key');
+  if(!shareKey) return;
+  var url=window.location.origin+'/party/s/'+shareKey;
+  navigator.clipboard.writeText(url).then(function(){
+    var btn=document.getElementById('share-party-btn');
+    if(btn){btn.textContent='Link Copied!';setTimeout(function(){btn.textContent='Share'},2000)}
+  });
+}
+function openPartiesModal(){
+  document.getElementById('parties-modal').classList.add('visible');
+  var list=document.getElementById('parties-list');
+  list.innerHTML='<div style="color:#888;padding:16px;text-align:center;">Loading...</div>';
+  fetch('/api/user/parties').then(function(r){return r.json()}).then(function(parties){
+    if(!parties||parties.length===0){
+      list.innerHTML='<div style="color:#888;padding:16px;text-align:center;">No saved parties yet.</div>';
+      return;
+    }
+    list.innerHTML='';
+    parties.forEach(function(p){
+      var row=document.createElement('div');
+      row.className='party-row';
+      var nameDiv=document.createElement('div');
+      nameDiv.className='party-row-name';
+      nameDiv.textContent=p.name;
+      row.appendChild(nameDiv);
+      var actions=document.createElement('div');
+      actions.className='party-row-actions';
+      var loadBtn=document.createElement('button');
+      loadBtn.textContent='Load';
+      loadBtn.onclick=function(){
+        saveParty(p.character_ids);
+        localStorage.setItem('ffrk_party_name',p.name);
+        localStorage.setItem('ffrk_party_saved_id',p.id);
+        localStorage.setItem('ffrk_party_share_key',p.share_key);
+        closePartiesModal();
+        syncURL();
+      };
+      actions.appendChild(loadBtn);
+      var shareBtn=document.createElement('button');
+      shareBtn.textContent='Share';
+      shareBtn.onclick=function(){
+        var url=window.location.origin+'/party/s/'+p.share_key;
+        navigator.clipboard.writeText(url).then(function(){
+          shareBtn.textContent='Copied!';
+          setTimeout(function(){shareBtn.textContent='Share'},2000);
+        });
+      };
+      actions.appendChild(shareBtn);
+      var delBtn=document.createElement('button');
+      delBtn.textContent='Delete';
+      delBtn.className='danger';
+      delBtn.onclick=function(){
+        if(!confirm('Delete this party?'))return;
+        fetch('/api/user/parties?id='+p.id,{method:'DELETE'}).then(function(r){
+          if(r.ok){
+            row.remove();
+            if(localStorage.getItem('ffrk_party_saved_id')===p.id){
+              localStorage.removeItem('ffrk_party_saved_id');
+              localStorage.removeItem('ffrk_party_share_key');
+              updateShareButton();
+            }
+            if(list.children.length===0){
+              list.innerHTML='<div style="color:#888;padding:16px;text-align:center;">No saved parties yet.</div>';
+            }
+          }
+        });
+      };
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+  });
+}
+function closePartiesModal(){document.getElementById('parties-modal').classList.remove('visible')}
+document.getElementById('parties-modal').addEventListener('click',function(e){if(e.target===this)closePartiesModal()});
+// Init share button visibility
+(function(){updateShareButton()})();
 {{end}}
 
 // --- Add Character Picker ---
@@ -652,7 +842,6 @@ function renderDropdown(filter){
 function pickCharacter(id,name){
   var party=getParty();
   if(party.indexOf(id)!==-1) return;
-  // Store name for replace modal
   try{var pn=JSON.parse(localStorage.getItem('ffrk_party_names'))||{}}catch(e){var pn={}}
   pn[id]=name;
   localStorage.setItem('ffrk_party_names',JSON.stringify(pn));
@@ -724,6 +913,7 @@ function updateHighlight(){
   visibleOptions.forEach(function(o,i){o.classList.toggle('highlighted',i===highlightIdx)});
   if(highlightIdx>=0&&visibleOptions[highlightIdx]){visibleOptions[highlightIdx].scrollIntoView({block:'nearest'})}
 }
+{{end}}
 </script>
 {{template "scroll_top" .}}
 {{template "kofi_widget" .}}</body></html>

@@ -224,6 +224,16 @@ type PartyData struct {
 	LoggedIn        bool
 	OwnedSoulbreaks map[string]bool
 	EffectSummary   []EffectSummary
+	IsShared        bool
+	OwnerName       string
+	PartyName       string
+}
+
+type SavedParty struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	CharacterIDs []string `json:"character_ids"`
+	ShareKey     string   `json:"share_key"`
 }
 
 type SearchData struct {

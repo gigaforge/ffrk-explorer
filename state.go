@@ -24,6 +24,8 @@ var (
 	usersByAPI     map[string]*User        // api_key → user
 	userSoulbreaks map[int]map[string]bool // user_id → set of soulbreak IDs
 	sessions       map[string]int          // session_token → user_id
+	userParties    map[int][]*SavedParty   // user_id → saved parties
+	partyByShare   map[string]int          // share_key → user_id
 	userLock       sync.RWMutex
 	nextUserID     int
 )
