@@ -48,6 +48,20 @@ func TestHasPartyEffectByTarget(t *testing.T) {
 	}
 }
 
+func TestHasPartyEffectPatternExcludesSecondGrantsClause(t *testing.T) {
+	// Sice DASB: "to all allies" belongs to the second "grants" clause, not the first
+	sice := "Grants [Instant ATB 1] and [Dual Awoken Darkness Mode II (Sice)], removes [Dual Awoken Darkness Mode I (Sice)], grants [ATK, DEF, MAG and RES +30% (25s)] to all allies"
+	if hasPartyEffectPattern(sice, instantATBRe) {
+		t.Fatal("should not match Instant ATB as party effect when 'to all allies' belongs to a different grants clause")
+	}
+
+	// Effect and "to all allies" in the same grants clause → should match
+	simple := "Grants [Instant ATB 1] to all allies"
+	if !hasPartyEffectPattern(simple, instantATBRe) {
+		t.Fatal("expected match when effect and 'to all allies' are in same grants clause")
+	}
+}
+
 func TestTextContainsImperilMatchesPrismaticImperilForSpecificElements(t *testing.T) {
 	if !textContainsImperil("Chases with minor Prismatic Imperil for 5 seconds", "Poison") {
 		t.Fatal("expected Poison imperil filter to match Prismatic Imperil text")

@@ -45,7 +45,7 @@ func hasPartyEffectPattern(text string, re *regexp.Regexp) bool {
 				}
 				phrasePos := searchFrom + phraseIdx
 				between := tail[:phrasePos]
-				if !strings.Contains(between, "to the user") && !strings.Contains(between, "to user") {
+				if !strings.Contains(between, "to the user") && !strings.Contains(between, "to user") && !strings.Contains(between, "grants") {
 					return true
 				}
 				searchFrom = phrasePos + len(phrase)
