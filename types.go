@@ -100,6 +100,7 @@ type SoulBreak struct {
 	Name             string
 	Tier             string
 	SBVer            string
+	Target           string
 	Type             string
 	Multiplier       string
 	Element          string

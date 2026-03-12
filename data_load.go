@@ -312,6 +312,7 @@ func (d *AppData) loadSoulBreaks() error {
 			Name:       row["Name"],
 			Tier:       row["Tier"],
 			SBVer:      row["SB Ver"],
+			Target:     row["Target"],
 			Type:       row["Type"],
 			Multiplier: mult,
 			Element:    row["Element"],

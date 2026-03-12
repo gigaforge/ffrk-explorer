@@ -55,6 +55,58 @@ func hasPartyEffectPattern(text string, re *regexp.Regexp) bool {
 	return false
 }
 
+// hasPartyEffectByTarget checks if an effect applies to the party based on the
+// soul break's target being "All allies" and the effect appearing after "Grants"
+// but before any second "Grants...to user" boundary.
+func hasPartyEffectByTarget(text string, target string, re *regexp.Regexp) bool {
+	if !strings.EqualFold(target, "All allies") {
+		return false
+	}
+	lowerText := strings.ToLower(text)
+
+	// Find the first occurrence of "grants"
+	grantsIdx := strings.Index(lowerText, "grants")
+	if grantsIdx < 0 {
+		return false
+	}
+	afterFirstGrants := grantsIdx + len("grants")
+
+	// Find the party region end: either a second "grants" that leads to "to user"/"to the user", or end of text
+	partyRegionEnd := len(lowerText)
+	searchFrom := afterFirstGrants
+	for {
+		nextGrants := strings.Index(lowerText[searchFrom:], "grants")
+		if nextGrants < 0 {
+			break
+		}
+		nextGrantsPos := searchFrom + nextGrants
+		afterNext := lowerText[nextGrantsPos:]
+		if strings.Contains(afterNext, "to user") || strings.Contains(afterNext, "to the user") {
+			partyRegionEnd = nextGrantsPos
+			break
+		}
+		searchFrom = nextGrantsPos + len("grants")
+	}
+
+	// Check if the regex matches within the party region
+	partyRegion := text[afterFirstGrants:partyRegionEnd]
+	return re.MatchString(partyRegion)
+}
+
+// sbPartyEffectCheckers maps effect filter keys to functions that check if a soul break
+// provides a party-wide effect, considering both text patterns and the SB's target field.
+var sbPartyEffectCheckers = map[string]func(SoulBreak) bool{
+	"party_crit_chance": func(sb SoulBreak) bool {
+		return hasPartyEffectByTarget(sb.Effects, sb.Target, critChanceRe)
+	},
+	"party_crit_damage": func(sb SoulBreak) bool {
+		return hasPartyEffectByTarget(sb.Effects, sb.Target, critDamageRe)
+	},
+	"party_instant_atb": func(sb SoulBreak) bool {
+		return hasPartyEffectByTarget(sb.Effects, sb.Target, instantATBRe)
+	},
+}
+
 // effectCheckers maps effect filter keys to functions that check if a text matches.
 var effectCheckers = map[string]func(string) bool{
 	"aegis_counter": func(text string) bool {
@@ -249,38 +301,36 @@ func sbMatchesProshellga(sb SoulBreak) bool {
 		walkSBTexts(sb, opts, effectCheckers["shell"])
 }
 
+// sbMatchesEffect checks if a soul break matches a single effect filter key.
+func sbMatchesEffect(sb SoulBreak, eff string) bool {
+	if eff == "proshellga" {
+		return sbMatchesProshellga(sb)
+	}
+	// Check SB-level party effect checkers (target-based) first
+	if sbChecker, ok := sbPartyEffectCheckers[eff]; ok {
+		if sbChecker(sb) {
+			return true
+		}
+	}
+	checker, ok := effectCheckers[eff]
+	if !ok {
+		return false
+	}
+	return walkSBTexts(sb, sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}, checker)
+}
+
 // sbMatchesAdditionalEffects checks if a soul break matches the given effect filters using the specified mode.
 func sbMatchesAdditionalEffects(sb SoulBreak, effects []string, mode string) bool {
 	if mode == "or" {
 		for _, eff := range effects {
-			if eff == "proshellga" {
-				if sbMatchesProshellga(sb) {
-					return true
-				}
-				continue
-			}
-			checker, ok := effectCheckers[eff]
-			if !ok {
-				continue
-			}
-			if walkSBTexts(sb, sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}, checker) {
+			if sbMatchesEffect(sb, eff) {
 				return true
 			}
 		}
 		return false
 	}
 	for _, eff := range effects {
-		if eff == "proshellga" {
-			if !sbMatchesProshellga(sb) {
-				return false
-			}
-			continue
-		}
-		checker, ok := effectCheckers[eff]
-		if !ok {
-			continue
-		}
-		if !walkSBTexts(sb, sbTextWalkOptions{IncludeStatuses: true, IncludeBrave: true}, checker) {
+		if !sbMatchesEffect(sb, eff) {
 			return false
 		}
 	}
