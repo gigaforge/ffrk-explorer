@@ -16,6 +16,7 @@ var critChanceRe = regexp.MustCompile(`(?i)\d+% critical[\]\s\d]`)
 var critDamageRe = regexp.MustCompile(`(?i)critical damage \+\d+%`)
 var sbGaugeRe = regexp.MustCompile(`(?i)soul break gauge \+`)
 var atbSpeedRe = regexp.MustCompile(`(?i)\d+% atb`)
+var instantATBRe = regexp.MustCompile(`(?i)instant atb`)
 var aegisCounterRe = regexp.MustCompile(`(?i)def, res and mnd -\d+%`)
 var fullbreakCounterRe = regexp.MustCompile(`(?i)atk, def, mag and res \+\d+%`)
 var physJobBreakCounterRe = regexp.MustCompile(`(?i)atk and mnd \+\d+%, def and res \+\d+%`)
@@ -116,6 +117,9 @@ var effectCheckers = map[string]func(string) bool{
 	},
 	"instant_atb": func(text string) bool {
 		return containsCI(text, "Instant ATB")
+	},
+	"party_instant_atb": func(text string) bool {
+		return hasPartyCritPattern(text, instantATBRe)
 	},
 	"atb_speed": func(text string) bool {
 		return atbSpeedRe.MatchString(text)
