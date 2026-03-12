@@ -43,7 +43,7 @@ func hasPartyCritPattern(text string, re *regexp.Regexp) bool {
 			}
 			alliesPos := searchFrom + alliesIdx
 			between := tail[:alliesPos]
-			if !strings.Contains(between, "to the user") {
+			if !strings.Contains(between, "to the user") && !strings.Contains(between, "to user") {
 				return true
 			}
 			searchFrom = alliesPos + len("to all allies")
