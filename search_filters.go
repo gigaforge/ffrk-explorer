@@ -27,7 +27,7 @@ var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
 var sorceryBoostRe = regexp.MustCompile(`(?i)sorcery damage \+\d+%`)
 var pentabreakBoostRe = regexp.MustCompile(`(?i)pentabreak damage boost`)
 
-func hasPartyCritPattern(text string, re *regexp.Regexp) bool {
+func hasPartyEffectPattern(text string, re *regexp.Regexp) bool {
 	lowerText := strings.ToLower(text)
 	for _, idx := range re.FindAllStringIndex(text, -1) {
 		tail := lowerText[idx[1]:]
@@ -35,18 +35,21 @@ func hasPartyCritPattern(text string, re *regexp.Regexp) bool {
 			continue
 		}
 
-		searchFrom := 0
-		for {
-			alliesIdx := strings.Index(tail[searchFrom:], "to all allies")
-			if alliesIdx < 0 {
-				break
+		partyPhrases := []string{"to all allies", "to party"}
+		for _, phrase := range partyPhrases {
+			searchFrom := 0
+			for {
+				phraseIdx := strings.Index(tail[searchFrom:], phrase)
+				if phraseIdx < 0 {
+					break
+				}
+				phrasePos := searchFrom + phraseIdx
+				between := tail[:phrasePos]
+				if !strings.Contains(between, "to the user") && !strings.Contains(between, "to user") {
+					return true
+				}
+				searchFrom = phrasePos + len(phrase)
 			}
-			alliesPos := searchFrom + alliesIdx
-			between := tail[:alliesPos]
-			if !strings.Contains(between, "to the user") && !strings.Contains(between, "to user") {
-				return true
-			}
-			searchFrom = alliesPos + len("to all allies")
 		}
 	}
 	return false
@@ -98,13 +101,13 @@ var effectCheckers = map[string]func(string) bool{
 		return critChanceRe.MatchString(text)
 	},
 	"party_crit_chance": func(text string) bool {
-		return hasPartyCritPattern(text, critChanceRe)
+		return hasPartyEffectPattern(text, critChanceRe)
 	},
 	"crit_damage": func(text string) bool {
 		return critDamageRe.MatchString(text)
 	},
 	"party_crit_damage": func(text string) bool {
-		return hasPartyCritPattern(text, critDamageRe)
+		return hasPartyEffectPattern(text, critDamageRe)
 	},
 	"sb_gauge": func(text string) bool {
 		return sbGaugeRe.MatchString(text)
@@ -119,7 +122,7 @@ var effectCheckers = map[string]func(string) bool{
 		return containsCI(text, "Instant ATB")
 	},
 	"party_instant_atb": func(text string) bool {
-		return hasPartyCritPattern(text, instantATBRe)
+		return hasPartyEffectPattern(text, instantATBRe)
 	},
 	"atb_speed": func(text string) bool {
 		return atbSpeedRe.MatchString(text)
