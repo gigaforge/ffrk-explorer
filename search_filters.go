@@ -71,21 +71,23 @@ func hasPartyEffectByTarget(text string, target string, re *regexp.Regexp) bool 
 	}
 	afterFirstGrants := grantsIdx + len("grants")
 
-	// Find the party region end: either a second "grants" that leads to "to user"/"to the user", or end of text
+	// Find the party region end: either a second "grants" that leads to "to user"/"to the user", or end of text.
+	// If there is only one "grants" and "to user" appears after it, the effects go to the user, not the party.
+	afterGrants := lowerText[afterFirstGrants:]
 	partyRegionEnd := len(lowerText)
-	searchFrom := afterFirstGrants
-	for {
-		nextGrants := strings.Index(lowerText[searchFrom:], "grants")
-		if nextGrants < 0 {
-			break
+	secondGrants := strings.Index(afterGrants, "grants")
+	if secondGrants >= 0 {
+		// Second "grants" found — if it leads to "to user", party region ends there
+		secondGrantsPos := afterFirstGrants + secondGrants
+		afterSecond := lowerText[secondGrantsPos:]
+		if strings.Contains(afterSecond, "to user") || strings.Contains(afterSecond, "to the user") {
+			partyRegionEnd = secondGrantsPos
 		}
-		nextGrantsPos := searchFrom + nextGrants
-		afterNext := lowerText[nextGrantsPos:]
-		if strings.Contains(afterNext, "to user") || strings.Contains(afterNext, "to the user") {
-			partyRegionEnd = nextGrantsPos
-			break
+	} else {
+		// No second "grants" — if "to user" appears, all effects go to user, not party
+		if strings.Contains(afterGrants, "to user") || strings.Contains(afterGrants, "to the user") {
+			return false
 		}
-		searchFrom = nextGrantsPos + len("grants")
 	}
 
 	// Check if the regex matches within the party region

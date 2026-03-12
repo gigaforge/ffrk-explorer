@@ -35,6 +35,12 @@ func TestHasPartyEffectByTarget(t *testing.T) {
 		t.Fatal("should not match when Instant ATB is in the user-only region")
 	}
 
+	// Single "grants" with "to user" → all effects go to user, not party (Gilgamesh MASB case)
+	singleGrantsToUser := "Damage +5% to Samurais, grants Master Mode, Instant ATB 1 & Diffusion Barrier 1 to user"
+	if hasPartyEffectByTarget(singleGrantsToUser, "All allies", instantATBRe) {
+		t.Fatal("should not match when single grants clause ends with to user")
+	}
+
 	// Single grants with no "to user" → everything after grants is party
 	allParty := "Grants Instant ATB 1, Instant Cast 1"
 	if !hasPartyEffectByTarget(allParty, "All allies", instantATBRe) {
