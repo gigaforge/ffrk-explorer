@@ -223,6 +223,7 @@ var summaryEffects = []struct {
 	{"phys_job_break_counter", "Phys Job Break Counter"},
 	{"mag_job_break_counter", "Mag Job Break Counter"},
 	{"proshellga", "Proshellga"},
+	{"party_haste", "Party Haste"},
 	{"last_stand", "Last Stand"},
 	{"regenga", "Regenga"},
 	{"astra", "Astra"},
@@ -272,14 +273,19 @@ func buildEffectSummary(members []PartyMember, loggedIn bool, owned map[string]b
 					if eff.Key == "proshellga" {
 						found = sbMatchesProshellga(sb)
 					} else {
-						checker := effectCheckers[eff.Key]
-						if checker == nil {
-							continue
+						if sbChecker, ok := sbPartyEffectCheckers[eff.Key]; ok {
+							found = sbChecker(sb)
 						}
-						found = walkSBTexts(sb, sbTextWalkOptions{
-							IncludeStatuses: true,
-							IncludeBrave:    true,
-						}, checker)
+						if !found {
+							checker := effectCheckers[eff.Key]
+							if checker == nil {
+								continue
+							}
+							found = walkSBTexts(sb, sbTextWalkOptions{
+								IncludeStatuses: true,
+								IncludeBrave:    true,
+							}, checker)
+						}
 					}
 					if found {
 						count++

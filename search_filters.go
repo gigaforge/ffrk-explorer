@@ -26,6 +26,7 @@ var magicalBoostRe = regexp.MustCompile(`(?i)magical \+\d+%`)
 var phyBoostRe = regexp.MustCompile(`(?i)phy \+\d+%`)
 var sorceryBoostRe = regexp.MustCompile(`(?i)sorcery damage \+\d+%`)
 var pentabreakBoostRe = regexp.MustCompile(`(?i)pentabreak damage boost`)
+var hasteRe = regexp.MustCompile(`(?i)\bHaste\]`)
 
 func hasPartyEffectPattern(text string, re *regexp.Regexp) bool {
 	lowerText := strings.ToLower(text)
@@ -107,6 +108,9 @@ var sbPartyEffectCheckers = map[string]func(SoulBreak) bool{
 	"party_instant_atb": func(sb SoulBreak) bool {
 		return hasPartyEffectByTarget(sb.Effects, sb.Target, instantATBRe)
 	},
+	"party_haste": func(sb SoulBreak) bool {
+		return hasPartyEffectByTarget(sb.Effects, sb.Target, hasteRe)
+	},
 }
 
 // effectCheckers maps effect filter keys to functions that check if a text matches.
@@ -162,6 +166,9 @@ var effectCheckers = map[string]func(string) bool{
 	},
 	"party_crit_damage": func(text string) bool {
 		return hasPartyEffectPattern(text, critDamageRe)
+	},
+	"party_haste": func(text string) bool {
+		return hasPartyEffectPattern(text, hasteRe)
 	},
 	"sb_gauge": func(text string) bool {
 		return sbGaugeRe.MatchString(text)
