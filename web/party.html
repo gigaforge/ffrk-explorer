@@ -910,6 +910,10 @@ function openPartiesModal(){
       var loadBtn=document.createElement('button');
       loadBtn.textContent='Load';
       loadBtn.onclick=function(){
+        if(p.source==='sync'){
+          window.location='/party/s/'+p.share_key;
+          return;
+        }
         saveParty(p.character_ids);
         saveHiddenSBs(p.hidden_sbs||[]);
         localStorage.setItem('ffrk_party_name',p.name);

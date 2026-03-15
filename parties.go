@@ -145,22 +145,7 @@ func userPartiesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For synced parties, compute hidden_sbs from visible_sbs dynamically
-	result := make([]*SavedParty, len(parties))
-	for i, p := range parties {
-		if p.Source == "sync" && len(p.VisibleSBs) > 0 {
-			visibleSet := make(map[string]bool, len(p.VisibleSBs))
-			for _, id := range p.VisibleSBs {
-				visibleSet[id] = true
-			}
-			cp := *p
-			cp.HiddenSBs = computeHiddenFromVisible(p.CharacterIDs, visibleSet)
-			result[i] = &cp
-		} else {
-			result[i] = p
-		}
-	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, parties)
 }
 
 func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
