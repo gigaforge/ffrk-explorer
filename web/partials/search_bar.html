@@ -26,49 +26,63 @@
 </div>
 <div class="search-bar">
   <button class="search-bar-toggle" id="search-bar-toggle" onclick="toggleSearchBar()">&#128269; Open Search</button>
-  <label>Character</label>
-  <input type="text" id="char-input" name="ffrk-character" list="char-list" placeholder="Character..." autocomplete="ffrkjunk" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
-  <datalist id="char-list"></datalist>
-  <label>Realm</label>
-  <select id="realm-select">
-    <option value="">Any</option>
-    <option>I</option><option>II</option><option>III</option><option>IV</option>
-    <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
-    <option>IX</option><option>X</option><option>XI</option><option>XII</option>
-    <option>XIII</option><option>XIV</option><option>XV</option><option>XVI</option>
-    <option>FFT</option><option>Type-0</option><option>KH</option><option>Beyond</option><option>Core</option>
-  </select>
-  <label>Type</label>
-  <select id="type-select">
-    <option value="">Any</option>
-    <option value="PHY">Physical</option>
-    <option value="MAG">Magical</option>
-    <option value="MND">Mind</option>
-  </select>
-  <label>SB Tier</label>
-  <select id="tier-select">
-    <option value="">Any</option>
-  </select>
-  <label>En-Element</label>
-  <select id="en-element-select">
-    <option value="">Any</option>
-    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
-    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
-    <option>Poison</option>
-  </select>
-  <label>Imperil</label>
-  <select id="imperil-select">
-    <option value="">Any</option>
-    <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
-    <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
-    <option>Poison</option><option>Prismatic</option>
-  </select>
+  <div class="filter-group">
+    <label>Character</label>
+    <input type="text" id="char-input" name="ffrk-character" list="char-list" placeholder="Character..." autocomplete="ffrkjunk" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="search" enterkeyhint="search" data-lpignore="true" data-1p-ignore="true">
+    <datalist id="char-list"></datalist>
+  </div>
+  <div class="filter-group">
+    <label>Realm</label>
+    <select id="realm-select">
+      <option value="">Any</option>
+      <option>I</option><option>II</option><option>III</option><option>IV</option>
+      <option>V</option><option>VI</option><option>VII</option><option>VIII</option>
+      <option>IX</option><option>X</option><option>XI</option><option>XII</option>
+      <option>XIII</option><option>XIV</option><option>XV</option><option>XVI</option>
+      <option>FFT</option><option>Type-0</option><option>KH</option><option>Beyond</option><option>Core</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Type</label>
+    <select id="type-select">
+      <option value="">Any</option>
+      <option value="PHY">Physical</option>
+      <option value="MAG">Magical</option>
+      <option value="MND">Mind</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>SB Tier</label>
+    <select id="tier-select">
+      <option value="">Any</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>En-Element</label>
+    <select id="en-element-select">
+      <option value="">Any</option>
+      <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+      <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+      <option>Poison</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Imperil</label>
+    <select id="imperil-select">
+      <option value="">Any</option>
+      <option>Fire</option><option>Ice</option><option>Wind</option><option>Earth</option>
+      <option>Lightning</option><option>Water</option><option>Dark</option><option>Holy</option>
+      <option>Poison</option><option>Prismatic</option>
+    </select>
+  </div>
   <button onclick="openEffectsModal()">Effects<span id="effects-badge" class="effects-badge" style="display:none"></span></button>
   <button onclick="openSchoolsModal()">Job<span id="schools-badge" class="effects-badge" style="display:none"></span></button>
   <button class="search-btn" onclick="doSearch()">Search</button>
-  <a href="/party" id="party-link" class="party-link" onclick="goToParty(event)">Party<span id="party-count" class="effects-badge" style="display:none"></span></a>
+  <button class="clear-all-btn" onclick="clearAllFilters()">Clear All</button>
   <label id="owned-filter" style="display:none"><input type="checkbox" id="owned-only" onchange="document.cookie='owned_only='+(this.checked?'1':'0')+';path=/;max-age=31536000'"> Owned only</label>
-  <div class="auth-area" id="auth-area"></div>
+  <div class="auth-area" id="auth-area">
+    <a href="/party" id="party-link" class="party-link" onclick="goToParty(event)">Party<span id="party-count" class="effects-badge" style="display:none"></span></a>
+  </div>
 </div>
 <div class="modal-overlay" id="effects-modal">
   <div class="modal">
@@ -288,8 +302,9 @@ function showLogin(){document.getElementById('login-error').style.display='none'
 function showRegister(){document.getElementById('register-error').style.display='none';document.getElementById('register-modal').classList.add('visible');document.getElementById('register-username').focus()}
 function renderAuth(username,apiKey){
   var area=document.getElementById('auth-area');
+  var partyHtml='<a href="/party" id="party-link" class="party-link" onclick="goToParty(event)">Party<span id="party-count" class="effects-badge" style="display:none"></span></a>';
   if(username){
-    var html='<span class="welcome">Welcome, '+username+'</span>';
+    var html=partyHtml;
     if(apiKey){
       html+='<div class="api-key-wrapper"><button class="api-key-btn" onclick="toggleApiKey(this)">Show API Key</button>';
       html+='<div class="api-key-tooltip" id="api-key-tooltip">';
@@ -300,8 +315,9 @@ function renderAuth(username,apiKey){
     html+='<button onclick="doLogout()">Logout</button>';
     area.innerHTML=html;window.__apiKey=apiKey;document.getElementById('owned-filter').style.display='';
     if(!new URLSearchParams(window.location.search).has('owned')&&document.cookie.match(/(?:^|;\s*)owned_only=1/)){document.getElementById('owned-only').checked=true}
+    updatePartyBadge();
   }
-  else{area.innerHTML='<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false;document.cookie='owned_only=0;path=/;max-age=0';window.__apiKey=null}
+  else{area.innerHTML=partyHtml+'<button onclick="showLogin()">Login</button><button onclick="showRegister()">Register</button>';document.getElementById('owned-filter').style.display='none';document.getElementById('owned-only').checked=false;document.cookie='owned_only=0;path=/;max-age=0';window.__apiKey=null;updatePartyBadge()}
 }
 function toggleApiKey(btn){
   var tooltip=document.getElementById('api-key-tooltip');
@@ -359,6 +375,19 @@ fetch('/api/me').then(function(r){if(r.ok)return r.json();return null}).then(fun
   if(p.get('effectmode')==='and')setEffectMode('and');
   if(p.get('schoolmode')==='or')setSchoolMode('or');
 })();
+function clearAllFilters(){
+  document.getElementById('char-input').value='';
+  document.getElementById('realm-select').value='';
+  document.getElementById('type-select').value='';
+  document.getElementById('tier-select').value='';
+  document.getElementById('en-element-select').value='';
+  document.getElementById('imperil-select').value='';
+  document.getElementById('owned-only').checked=false;
+  clearEffects();
+  clearSchools();
+  setEffectMode('or');
+  setSchoolMode('and');
+}
 function goToParty(e){
   e.preventDefault();
   try{
@@ -368,15 +397,16 @@ function goToParty(e){
     window.location=url;
   }catch(ex){window.location='/party'}
 }
-(function(){
+function updatePartyBadge(){
   try{
     var ids=JSON.parse(localStorage.getItem('ffrk_party'))||[];
-    if(ids.length>0){
-      var badge=document.getElementById('party-count');
-      badge.textContent=ids.length;
-      badge.style.display='inline';
+    var badge=document.getElementById('party-count');
+    if(badge){
+      if(ids.length>0){badge.textContent=ids.length;badge.style.display='inline'}
+      else{badge.style.display='none'}
     }
   }catch(e){}
-})();
+}
+updatePartyBadge();
 </script>
 {{end}}

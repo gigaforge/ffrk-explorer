@@ -14,7 +14,11 @@ body { padding-top: calc(var(--search-bar-height, 58px) + 12px); }
 .search-bar button { background: #e94560; color: #fff; border: none; border-radius: 4px;
                      padding: 6px 16px; font-size: 14px; cursor: pointer; }
 .search-bar button:hover { background: #d63050; }
-.search-bar label { color: #888; font-size: 12px; margin-right: -4px; }
+.search-bar label { color: #888; font-size: 12px; }
+.filter-group { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.filter-group label { margin-bottom: 0; }
+.clear-all-btn { background: #0f3460 !important; }
+.clear-all-btn:hover { background: #1a3a6e !important; }
 .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                  background: rgba(0,0,0,0.6); z-index: 200; align-items: center; justify-content: center; }
 .modal-overlay.visible { display: flex; }
@@ -45,7 +49,6 @@ body { padding-top: calc(var(--search-bar-height, 58px) + 12px); }
 .school-toggle button.active { background: #e94560; border-color: #e94560; color: #fff; }
 #owned-filter input[type="checkbox"] { accent-color: #e94560; cursor: pointer; }
 .search-bar .auth-area { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.search-bar .auth-area .welcome { color: #e0e0e0; font-size: 14px; }
 .search-bar .auth-area button { font-size: 13px; padding: 5px 12px; }
 .api-key-wrapper { position: relative; }
 .api-key-btn { background: #0f3460 !important; }
@@ -69,7 +72,6 @@ body { padding-top: calc(var(--search-bar-height, 58px) + 12px); }
   .search-bar select { min-width: 88px; }
   .search-bar button { padding: 6px 10px; }
   .search-bar .auth-area { gap: 6px; }
-  .search-bar .auth-area .welcome { font-size: 13px; }
 }
 @media (max-width: 768px) {
   .modal { min-width: auto; width: 95vw; }
