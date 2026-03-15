@@ -655,7 +655,7 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 	totalUpdates := sbUpdates + lmUpdates
 	if totalUpdates > 0 {
 		saveUserSoulbreaksForUser(u.ID)
-		log.Printf("%s updated with %d new soulbreaks and %d new legend materia via FFRK-LabMem-SBTracker.", u.Username, sbUpdates, lmUpdates)
+		log.Printf("%s updated with %d new soulbreaks and %d new legend materia via FFRK-JP-LabMem.", u.Username, sbUpdates, lmUpdates)
 		var parts []string
 		if sbUpdates > 0 {
 			parts = append(parts, fmt.Sprintf("%d new Soulbreaks", sbUpdates))
