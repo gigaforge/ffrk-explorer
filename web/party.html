@@ -829,6 +829,7 @@ function clearParty(){
 }
 // On load, check if URL matches localStorage and redirect if needed
 (function(){
+  if(window.location.pathname.indexOf('/party/s/')===0) return;
   var ids=getParty();
   var hidden=getHiddenSBs();
   var params=new URLSearchParams(window.location.search);
