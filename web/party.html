@@ -246,9 +246,9 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   </div>
 </div>
 <div class="auth-modal-overlay" id="parties-modal">
-  <div class="auth-modal" style="max-width:500px;">
+  <div class="auth-modal" style="max-width:500px;max-height:80vh;display:flex;flex-direction:column;">
     <h3>My Parties</h3>
-    <div id="parties-list"></div>
+    <div id="parties-list" style="overflow-y:auto;flex:1;min-height:0;"></div>
     <div class="modal-buttons" style="margin-top:12px;">
       <button class="secondary" onclick="closePartiesModal()">Close</button>
     </div>
