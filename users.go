@@ -475,6 +475,13 @@ func partySyncHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	userLock.Unlock()
 
+	d := getAppDataSnapshot()
+	if d == nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Data not loaded yet")
+		return
+	}
+
 	// Parse the comma-separated values
 	values := strings.Split(partyList, ",")
 	for i := range values {
@@ -511,14 +518,12 @@ func partySyncHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			charID := values[pos]   // 1: Character ID
+			charID := values[pos]   // 1: Character ID (game buddy ID, needs mapping)
 			// values[pos+1]        // 2: Record Materia ID (ignored)
 			lm1 := values[pos+2]    // 3: Legend Materia 1
 			lm2 := values[pos+3]    // 4: Legend Materia 2
 			// values[pos+4]        // 5: Ability ID 1 (ignored)
 			// values[pos+5]        // 6: Ability ID 2 (ignored)
-
-			charIDs = append(charIDs, charID)
 
 			if lm1 != "" && lm1 != "0" {
 				visibleSBs = append(visibleSBs, lm1)
@@ -535,12 +540,16 @@ func partySyncHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
+			charIDs = append(charIDs, charID)
 			pos += 21
 		}
 
 		if len(charIDs) == 0 {
 			continue
 		}
+
+		// Resolve game buddy IDs to CSV character IDs
+		charIDs = resolveCharacterIDs(d, charIDs, visibleSBs)
 
 		partyName = strings.TrimSpace(partyName)
 		if len(partyName) > 60 {

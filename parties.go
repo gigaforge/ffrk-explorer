@@ -87,6 +87,76 @@ func generateID() string {
 	return hex.EncodeToString(b)
 }
 
+// resolveCharacterIDs maps character IDs to CSV IDs. IDs that are already
+// valid CSV IDs pass through unchanged. Unknown IDs (e.g. game buddy IDs)
+// are resolved by looking up which character owns the given SB/LM IDs.
+func resolveCharacterIDs(d *AppData, charIDs []string, visibleSBs []string) []string {
+	// Check if any IDs need resolution
+	needsResolve := false
+	for _, id := range charIDs {
+		if _, ok := d.CharByID[id]; !ok {
+			needsResolve = true
+			break
+		}
+	}
+	if !needsResolve {
+		return charIDs
+	}
+
+	// Build reverse lookups
+	sbToChar := make(map[string]string)
+	for charName, sbs := range d.SoulBreaks {
+		for _, sb := range sbs {
+			if sb.ID != "" {
+				sbToChar[sb.ID] = charName
+			}
+		}
+	}
+	for charName, lms := range d.LegendMateria {
+		for _, lm := range lms {
+			if lm.ID != "" {
+				sbToChar[lm.ID] = charName
+			}
+		}
+	}
+	charNameToID := make(map[string]string)
+	for _, ch := range d.Characters {
+		charNameToID[ch.Name] = ch.ID
+	}
+
+	// Resolve: partition visibleSBs per character position by iterating in order
+	// For bulk resolution, just find any matching character name from the visible set
+	resolved := make([]string, len(charIDs))
+	for i, id := range charIDs {
+		if _, ok := d.CharByID[id]; ok {
+			resolved[i] = id
+		} else {
+			resolved[i] = id // fallback to original if we can't resolve
+			for _, sbID := range visibleSBs {
+				if charName, ok := sbToChar[sbID]; ok {
+					if csvID, ok := charNameToID[charName]; ok {
+						if csvID != id {
+							// Verify this character isn't already in the list
+							alreadyUsed := false
+							for j := 0; j < i; j++ {
+								if resolved[j] == csvID {
+									alreadyUsed = true
+									break
+								}
+							}
+							if !alreadyUsed {
+								resolved[i] = csvID
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return resolved
+}
+
 // computeHiddenFromVisible returns the IDs of all SBs and LMs for the given
 // characters that are NOT in the visibleSet. This inverts an allowlist into a
 // blocklist compatible with the existing HiddenSBs rendering logic.
@@ -347,8 +417,14 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve character IDs (buddy IDs → CSV IDs) for synced parties
+	charIDs := party.CharacterIDs
+	if party.Source == "sync" {
+		charIDs = resolveCharacterIDs(d, party.CharacterIDs, party.VisibleSBs)
+	}
+
 	var members []PartyMember
-	for _, id := range party.CharacterIDs {
+	for _, id := range charIDs {
 		ch, ok := d.CharByID[id]
 		if !ok {
 			continue
@@ -373,7 +449,7 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 		for _, id := range party.VisibleSBs {
 			visibleSet[id] = true
 		}
-		for _, id := range computeHiddenFromVisible(party.CharacterIDs, visibleSet) {
+		for _, id := range computeHiddenFromVisible(charIDs, visibleSet) {
 			hiddenSBs[id] = true
 		}
 	} else {
