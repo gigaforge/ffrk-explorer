@@ -87,6 +87,35 @@ func generateID() string {
 	return hex.EncodeToString(b)
 }
 
+// computeHiddenFromVisible returns the IDs of all SBs and LMs for the given
+// characters that are NOT in the visibleSet. This inverts an allowlist into a
+// blocklist compatible with the existing HiddenSBs rendering logic.
+func computeHiddenFromVisible(charIDs []string, visibleSet map[string]bool) []string {
+	d := getAppDataSnapshot()
+	if d == nil {
+		return nil
+	}
+	var hidden []string
+	for _, id := range charIDs {
+		ch, ok := d.CharByID[id]
+		if !ok {
+			continue
+		}
+		for _, sb := range d.SoulBreaks[ch.Name] {
+			if !visibleSet[sb.ID] {
+				hidden = append(hidden, sb.ID)
+			}
+		}
+		for _, lm := range d.LegendMateria[ch.Name] {
+			if !visibleSet[lm.ID] {
+				hidden = append(hidden, lm.ID)
+			}
+		}
+	}
+	sort.Strings(hidden)
+	return hidden
+}
+
 // ---------- API handlers ----------
 
 func userPartiesHandler(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +144,23 @@ func userPartiesListHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, []*SavedParty{})
 		return
 	}
-	writeJSON(w, http.StatusOK, parties)
+
+	// For synced parties, compute hidden_sbs from visible_sbs dynamically
+	result := make([]*SavedParty, len(parties))
+	for i, p := range parties {
+		if p.Source == "sync" && len(p.VisibleSBs) > 0 {
+			visibleSet := make(map[string]bool, len(p.VisibleSBs))
+			for _, id := range p.VisibleSBs {
+				visibleSet[id] = true
+			}
+			cp := *p
+			cp.HiddenSBs = computeHiddenFromVisible(p.CharacterIDs, visibleSet)
+			result[i] = &cp
+		} else {
+			result[i] = p
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +219,11 @@ func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		found := false
 		for _, p := range parties {
 			if p.ID == req.ID {
+				if p.Source == "sync" {
+					userLock.Unlock()
+					jsonError(w, http.StatusForbidden, "synced parties cannot be edited")
+					return
+				}
 				p.Name = name
 				p.CharacterIDs = req.CharacterIDs
 				p.HiddenSBs = req.HiddenSBs
@@ -188,8 +238,14 @@ func userPartiesSaveHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		// Create new party
-		if len(parties) >= 50 {
+		// Create new party (synced parties don't count toward the limit)
+		userCreated := 0
+		for _, p := range parties {
+			if p.Source != "sync" {
+				userCreated++
+			}
+		}
+		if userCreated >= 50 {
 			userLock.Unlock()
 			jsonError(w, http.StatusBadRequest, "maximum 50 saved parties reached")
 			return
@@ -245,6 +301,11 @@ func userPartiesDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	found := false
 	for i, p := range parties {
 		if p.ID == id {
+			if p.Source == "sync" {
+				userLock.Unlock()
+				jsonError(w, http.StatusForbidden, "synced parties cannot be deleted")
+				return
+			}
 			if p.ShareKey != "" {
 				delete(partyByShare, p.ShareKey)
 			}
@@ -322,8 +383,18 @@ func sharedPartyHandler(w http.ResponseWriter, r *http.Request) {
 	owned := snapshotOwnedSoulbreaks(ownerUID)
 
 	hiddenSBs := make(map[string]bool)
-	for _, id := range party.HiddenSBs {
-		hiddenSBs[id] = true
+	if party.Source == "sync" && len(party.VisibleSBs) > 0 {
+		visibleSet := make(map[string]bool, len(party.VisibleSBs))
+		for _, id := range party.VisibleSBs {
+			visibleSet[id] = true
+		}
+		for _, id := range computeHiddenFromVisible(party.CharacterIDs, visibleSet) {
+			hiddenSBs[id] = true
+		}
+	} else {
+		for _, id := range party.HiddenSBs {
+			hiddenSBs[id] = true
+		}
 	}
 
 	data := PartyData{

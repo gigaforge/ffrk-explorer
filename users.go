@@ -456,6 +456,142 @@ func userSoulbreaksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func partySyncHandler(w http.ResponseWriter, r *http.Request) {
+	apiKey := r.FormValue("api_key")
+	partyList := r.FormValue("party_list")
+	if apiKey == "" || partyList == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, "Missing api_key or party_list")
+		return
+	}
+
+	userLock.Lock()
+	u := usersByAPI[apiKey]
+	if u == nil {
+		userLock.Unlock()
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprint(w, "Invalid API key")
+		return
+	}
+	userLock.Unlock()
+
+	// Parse the comma-separated values
+	values := strings.Split(partyList, ",")
+	for i := range values {
+		values[i] = strings.TrimSpace(values[i])
+	}
+
+	var newParties []*SavedParty
+	pos := 0
+	for pos < len(values) {
+		// Skip trailing empty values
+		if pos+3 > len(values) {
+			break
+		}
+
+		partyNumber := values[pos]
+		partyName := values[pos+1]
+		memberCountStr := values[pos+2]
+		pos += 3
+
+		memberCount, err := strconv.Atoi(memberCountStr)
+		if err != nil || memberCount < 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "Invalid member count: %s", memberCountStr)
+			return
+		}
+
+		var charIDs []string
+		var visibleSBs []string
+
+		for m := 0; m < memberCount; m++ {
+			if pos+21 > len(values) {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprint(w, "Unexpected end of data while parsing party members")
+				return
+			}
+
+			charID := values[pos]   // 1: Character ID
+			// values[pos+1]        // 2: Record Materia ID (ignored)
+			lm1 := values[pos+2]    // 3: Legend Materia 1
+			lm2 := values[pos+3]    // 4: Legend Materia 2
+			// values[pos+4]        // 5: Ability ID 1 (ignored)
+			// values[pos+5]        // 6: Ability ID 2 (ignored)
+
+			charIDs = append(charIDs, charID)
+
+			if lm1 != "" && lm1 != "0" {
+				visibleSBs = append(visibleSBs, lm1)
+			}
+			if lm2 != "" && lm2 != "0" {
+				visibleSBs = append(visibleSBs, lm2)
+			}
+
+			// Soulbreak IDs 1-15 (positions 6-20)
+			for s := 6; s < 21; s++ {
+				sbID := values[pos+s]
+				if sbID != "" && sbID != "0" {
+					visibleSBs = append(visibleSBs, sbID)
+				}
+			}
+
+			pos += 21
+		}
+
+		if len(charIDs) == 0 {
+			continue
+		}
+
+		partyName = strings.TrimSpace(partyName)
+		if len(partyName) > 60 {
+			partyName = partyName[:60]
+		}
+
+		p := &SavedParty{
+			ID:           "sync_" + partyNumber,
+			Name:         partyName,
+			CharacterIDs: charIDs,
+			ShareKey:     generateID(),
+			VisibleSBs:   visibleSBs,
+			Source:       "sync",
+		}
+		newParties = append(newParties, p)
+	}
+
+	// Replace all synced parties atomically
+	userLock.Lock()
+	parties := userParties[u.ID]
+
+	// Remove old synced parties and their share keys
+	var kept []*SavedParty
+	for _, p := range parties {
+		if p.Source == "sync" {
+			if p.ShareKey != "" {
+				delete(partyByShare, p.ShareKey)
+			}
+		} else {
+			kept = append(kept, p)
+		}
+	}
+
+	// Add new synced parties
+	for _, p := range newParties {
+		for partyByShare[p.ShareKey] != 0 {
+			p.ShareKey = generateID()
+		}
+		partyByShare[p.ShareKey] = u.ID
+		kept = append(kept, p)
+	}
+
+	userParties[u.ID] = kept
+	userLock.Unlock()
+
+	saveUserPartiesForUser(u.ID)
+
+	log.Printf("%s synced %d parties via ffrk_party_sync.", u.Username, len(newParties))
+	fmt.Fprintf(w, "Synced %d parties to your account at https://ffrk.gigaforge.com", len(newParties))
+}
+
 func syncHandler(w http.ResponseWriter, r *http.Request) {
 	apiKey := r.FormValue("api_key")
 	sbList := r.FormValue("sb_list")
@@ -478,23 +614,47 @@ func syncHandler(w http.ResponseWriter, r *http.Request) {
 		userSoulbreaks[u.ID] = make(map[string]bool)
 	}
 
-	updates := 0
-	for _, sb := range strings.Split(sbList, ",") {
-		sb = strings.TrimSpace(sb)
-		if sb == "" {
+	// Build a set of known legend materia IDs for fallback matching
+	lmIDs := make(map[string]bool)
+	d := getAppDataSnapshot()
+	if d != nil {
+		for _, lmList := range d.LegendMateria {
+			for _, lm := range lmList {
+				lmIDs[lm.ID] = true
+			}
+		}
+	}
+
+	sbUpdates := 0
+	lmUpdates := 0
+	for _, id := range strings.Split(sbList, ",") {
+		id = strings.TrimSpace(id)
+		if id == "" {
 			continue
 		}
-		if !userSoulbreaks[u.ID][sb] {
-			userSoulbreaks[u.ID][sb] = true
-			updates++
+		if !userSoulbreaks[u.ID][id] {
+			userSoulbreaks[u.ID][id] = true
+			if lmIDs[id] {
+				lmUpdates++
+			} else {
+				sbUpdates++
+			}
 		}
 	}
 	userLock.Unlock()
 
-	if updates > 0 {
+	totalUpdates := sbUpdates + lmUpdates
+	if totalUpdates > 0 {
 		saveUserSoulbreaksForUser(u.ID)
-		log.Printf("%s updated with %d new soulbreaks via FFRK-LabMem-SBTracker.", u.Username, updates)
-		fmt.Fprintf(w, "Added %d new Soulbreaks to your account at https://ffrk.gigaforge.com", updates)
+		log.Printf("%s updated with %d new soulbreaks and %d new legend materia via FFRK-LabMem-SBTracker.", u.Username, sbUpdates, lmUpdates)
+		var parts []string
+		if sbUpdates > 0 {
+			parts = append(parts, fmt.Sprintf("%d new Soulbreaks", sbUpdates))
+		}
+		if lmUpdates > 0 {
+			parts = append(parts, fmt.Sprintf("%d new Legend Materia", lmUpdates))
+		}
+		fmt.Fprintf(w, "Added %s to your account at https://ffrk.gigaforge.com", strings.Join(parts, " and "))
 	} else {
 		fmt.Fprint(w, "No new soulbreaks to add")
 	}

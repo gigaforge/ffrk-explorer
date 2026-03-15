@@ -41,6 +41,7 @@ func main() {
 	http.HandleFunc("/api/user/soulbreaks", userSoulbreaksHandler)
 	http.HandleFunc("/api/user/parties", userPartiesHandler)
 	http.HandleFunc("/ffrk_sync.php", syncHandler)
+	http.HandleFunc("/ffrk_party_sync", partySyncHandler)
 
 	addr := "0.0.0.0:9090"
 	fmt.Printf("Server running at http://localhost%s\n", addr)

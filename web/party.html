@@ -321,6 +321,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   <table>
     <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Effect</th></tr>
     {{range .LegendMateria}}
+    {{if not (index $.HiddenSBs .ID)}}
     <tr class="sb-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleDetail(this)">
       <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<img src="{{.Img}}" style="width:32px;height:32px;">{{end}}</td>
@@ -343,6 +344,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       </td>
     </tr>
     {{end}}
+    {{end}}{{/* if not hidden */}}
     {{end}}
   </table>
   {{end}}
@@ -927,26 +929,28 @@ function openPartiesModal(){
         });
       };
       actions.appendChild(shareBtn);
-      var delBtn=document.createElement('button');
-      delBtn.textContent='Delete';
-      delBtn.className='danger';
-      delBtn.onclick=function(){
-        if(!confirm('Delete this party?'))return;
-        fetch('/api/user/parties?id='+p.id,{method:'DELETE'}).then(function(r){
-          if(r.ok){
-            row.remove();
-            if(localStorage.getItem('ffrk_party_saved_id')===p.id){
-              localStorage.removeItem('ffrk_party_saved_id');
-              localStorage.removeItem('ffrk_party_share_key');
-              updateShareButton();
+      if(p.source!=='sync'){
+        var delBtn=document.createElement('button');
+        delBtn.textContent='Delete';
+        delBtn.className='danger';
+        delBtn.onclick=function(){
+          if(!confirm('Delete this party?'))return;
+          fetch('/api/user/parties?id='+p.id,{method:'DELETE'}).then(function(r){
+            if(r.ok){
+              row.remove();
+              if(localStorage.getItem('ffrk_party_saved_id')===p.id){
+                localStorage.removeItem('ffrk_party_saved_id');
+                localStorage.removeItem('ffrk_party_share_key');
+                updateShareButton();
+              }
+              if(list.children.length===0){
+                list.innerHTML='<div style="color:#888;padding:16px;text-align:center;">No saved parties yet.</div>';
+              }
             }
-            if(list.children.length===0){
-              list.innerHTML='<div style="color:#888;padding:16px;text-align:center;">No saved parties yet.</div>';
-            }
-          }
-        });
-      };
-      actions.appendChild(delBtn);
+          });
+        };
+        actions.appendChild(delBtn);
+      }
       row.appendChild(actions);
       list.appendChild(row);
     });

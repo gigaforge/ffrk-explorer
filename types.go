@@ -239,6 +239,8 @@ type SavedParty struct {
 	CharacterIDs []string `json:"character_ids"`
 	ShareKey     string   `json:"share_key"`
 	HiddenSBs    []string `json:"hidden_sbs,omitempty"`
+	Source       string   `json:"source,omitempty"`
+	VisibleSBs   []string `json:"visible_sbs,omitempty"`
 }
 
 type SearchData struct {
