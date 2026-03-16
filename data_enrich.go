@@ -16,6 +16,41 @@ import (
 var bracketRe = regexp.MustCompile(`\[([^\]]+)\]`)
 var pctRe = regexp.MustCompile(`([+-])\d+%`)
 var forSecRe = regexp.MustCompile(`for (\d+(?:\.\d+)?) seconds`)
+
+// statSlashPctRe matches stat abbreviations separated by slashes followed by
+// a +/- percentage, e.g. "ATK/MND +25%" or "DEF/RES/MND -70%".
+var statSlashPctRe = regexp.MustCompile(`(?i)\b((?:ATK|DEF|MAG|RES|MND)(?:/(?:ATK|DEF|MAG|RES|MND))+) ([+-])`)
+
+// pctAmpStatRe matches a percentage followed by " & " and a stat name,
+// e.g. "+25% & DEF", used to convert ampersand separators between stat groups.
+var pctAmpStatRe = regexp.MustCompile(`(?i)([+-]\d+%) & ((?:ATK|DEF|MAG|RES|MND)\b)`)
+
+// statCanonOrder defines the canonical display order for stat abbreviations.
+var statCanonOrder = map[string]int{
+	"ATK": 1, "DEF": 2, "MAG": 3, "RES": 4, "MND": 5,
+}
+
+// normalizeStatShorthand converts shorthand stat notation to canonical form.
+// "ATK/MND +25% & DEF/RES +30%" becomes "ATK and MND +25%, DEF and RES +30%".
+func normalizeStatShorthand(text string) string {
+	// Step 1: Convert slash-separated stat groups to comma/and form,
+	// sorting stats into canonical order.
+	text = statSlashPctRe.ReplaceAllStringFunc(text, func(match string) string {
+		sign := match[len(match)-1:]               // "+" or "-"
+		statPart := strings.TrimSpace(match[:len(match)-1])
+		parts := strings.Split(statPart, "/")
+		sort.Slice(parts, func(i, j int) bool {
+			return statCanonOrder[strings.ToUpper(parts[i])] < statCanonOrder[strings.ToUpper(parts[j])]
+		})
+		if len(parts) == 2 {
+			return parts[0] + " and " + parts[1] + " " + sign
+		}
+		return strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1] + " " + sign
+	})
+	// Step 2: Convert "+X% & STAT" to "+X%, STAT" between stat buff groups.
+	text = pctAmpStatRe.ReplaceAllString(text, "${1}, ${2}")
+	return text
+}
 var skippedUnbracketedStatusTerms = map[string]bool{
 	"Poison": true,
 }
@@ -166,6 +201,7 @@ func wrapMatchedEffectText(text string, matches []statusTextMatch) string {
 // status has no default duration. It preserves existing brackets and adds
 // brackets to newly full-text-matched effects outside bracketed regions.
 func (d *AppData) matchAndBracketEffectsInText(text string) (string, []StatusEffect) {
+	text = normalizeStatShorthand(text)
 	bracketLocs := bracketRe.FindAllStringSubmatchIndex(text, -1)
 	durLocs := forSecRe.FindAllStringSubmatchIndex(text, -1)
 	occupied := make([]bool, len(text))
