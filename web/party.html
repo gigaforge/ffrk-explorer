@@ -326,7 +326,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<img src="{{.Img}}" style="width:32px;height:32px;">{{end}}</td>
       <td>{{.Name}}{{if .LMVer}} ({{.LMVer}}){{end}}{{if and $.LoggedIn (ne .Tier "LM") (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
-      <td>{{.Tier}}</td>
+      <td>{{.SBVer}}</td>
       <td class="effects">{{.Effect}}</td>
     </tr>
     {{if .MatchedEffects}}
@@ -359,7 +359,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
       <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
       <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
-      <td>{{.Tier}}</td>
+      <td>{{.SBVer}}</td>
       <td>{{.Type}}</td>
       <td>{{.Element}}</td>
       <td>{{.Time}}</td>
@@ -644,7 +644,7 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
           <td class="sb-chevron">{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}}<span class="chevron">&#9654;</span>{{end}}</td>
           <td>{{if .Img}}<span class="sb-icon"><img src="{{.Img}}"></span>{{end}}</td>
           <td>{{.Name}}{{if and $.LoggedIn (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
-          <td>{{.Tier}}</td>
+          <td>{{.SBVer}}</td>
           <td>{{.Type}}</td>
           <td>{{.Element}}</td>
           <td>{{.Time}}</td>

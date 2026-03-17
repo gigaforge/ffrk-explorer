@@ -255,7 +255,7 @@ td.sb-owned input[type="checkbox"] { accent-color: #e94560; cursor: pointer; wid
 {{if .SoulBreaks}}
 <h2>Soul Breaks ({{len .SoulBreaks}})</h2>
 <table>
-<tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>SB Ver</th><th>Type</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
+<tr>{{if $.LoggedIn}}<th></th>{{end}}<th></th><th></th><th>Name</th><th>Tier</th><th>Type</th><th>Multiplier</th><th>Element</th><th>Time</th><th>Effects</th></tr>
 {{range .SoulBreaks}}
 <tr class="sb-row{{if or .MatchedEffects .BurstCommands .SynchroAbilities .ZenithAbilities .TriggerAbilities .DualShift .ArcaneDyad .BraveCommand}} expandable{{end}}" onclick="toggleDetail(this)">
   {{if $.LoggedIn}}<td class="sb-owned" onclick="event.stopPropagation()"><input type="checkbox" data-sbid="{{.ID}}" onchange="toggleOwned(this)"{{if index $.OwnedSoulbreaks .ID}} checked{{end}}></td>{{end}}
