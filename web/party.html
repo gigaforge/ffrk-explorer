@@ -319,14 +319,14 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   {{if .LegendMateria}}
   <div class="section-label">Legend Materia</div>
   <table>
-    <tr><th></th><th></th><th>Name</th><th>Tier</th><th>Effect</th></tr>
+    <tr><th></th><th></th><th>Name</th><th>LM Ver</th><th>Effect</th></tr>
     {{range .LegendMateria}}
     {{if not (index $.HiddenSBs .ID)}}
     <tr class="sb-row{{if .MatchedEffects}} expandable{{end}}" onclick="toggleDetail(this)">
       <td class="sb-chevron">{{if .MatchedEffects}}<span class="chevron">&#9654;</span>{{end}}</td>
       <td>{{if .Img}}<img src="{{.Img}}" style="width:32px;height:32px;">{{end}}</td>
       <td>{{.Name}}{{if .LMVer}} ({{.LMVer}}){{end}}{{if and $.LoggedIn (ne .Tier "LM") (index $.OwnedSoulbreaks .ID)}}<span class="owned-mark">&#10004;</span>{{end}}</td>
-      <td>{{.SBVer}}</td>
+      <td>{{.LMVer}}</td>
       <td class="effects">{{.Effect}}</td>
     </tr>
     {{if .MatchedEffects}}
