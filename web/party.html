@@ -178,20 +178,136 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
 
 @media (max-width: 768px) {
   body { padding-left: 12px; padding-right: 12px; }
+
+  /* Party header stacks vertically */
+  .party-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .party-header h1 { text-align: center; }
+  .add-char-wrap { width: 100%; }
+  .add-char-input { width: 100%; }
+  .add-char-dropdown { width: 100%; }
+  .party-name-input { width: 100%; }
+  .party-actions { flex-direction: column; align-items: stretch; }
+  .party-action-btn { text-align: center; }
+  .clear-party-btn { width: 100%; text-align: center; }
+  .owned-toggle { justify-content: center; }
+
+  /* Party nav: horizontal scroll on small screens */
+  .party-nav { gap: 8px; padding: 8px 12px; overflow-x: auto; justify-content: flex-start; }
+  .party-nav a { font-size: 12px; min-width: 0; flex-shrink: 0; }
+  .party-nav a img { width: 28px; height: 28px; }
+
+  /* Summary panel */
+  .summary-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 12px; }
+  .summary-tooltip { left: auto; right: 0; }
+
+  /* Member cards */
   .member { padding: 12px; }
-  table { font-size: 13px; }
-  td img { width: 36px; height: 36px; }
+  .member-header img { width: 48px; height: 48px; }
+
+  /* Hide table headers on mobile */
+  table:not(.burst-table) > thead > tr,
+  table:not(.burst-table) > tbody > tr > th,
+  table:not(.burst-table) > tr:first-child { display: none; }
+
+  table:not(.burst-table) { border-collapse: separate; border-spacing: 0 8px; }
+
+  /* Soul break rows become cards */
+  tr.sb-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 8px; gap: 4px 8px;
+    background: #1a1a2e; border-radius: 6px;
+    border-bottom: none !important;
+  }
+  tr.sb-row > td { border-bottom: none; padding: 2px; background: transparent; }
+
+  /* Chevron */
+  tr.sb-row td.sb-chevron { order: 0; width: auto; padding: 2px 4px; }
+  /* Icon - shrink */
+  tr.sb-row td:has(.sb-icon) { order: 1; }
   .sb-icon, .sb-icon img { width: 36px; height: 36px; }
   .sb-icon img { width: 54px; height: 54px; margin: -9px; }
-  .effects { max-width: none; }
+  td img { width: 36px; height: 36px; }
 
+  /* Name cell (3rd visible cell in party SB table: chevron, icon, name) */
+  tr.sb-row td:nth-child(3):not(:has(.sb-icon)):not(.sb-chevron):not(:has(.effects)) { order: 2; font-weight: bold; color: #e94560; font-size: 14px; }
+
+  /* Metadata cells (Tier, Type, Element, Time) as inline tags */
+  tr.sb-row td:nth-child(4):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(5):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(6):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(7):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn))
+  { order: 3; font-size: 12px; color: #aaa; background: #16213e; border-radius: 3px; padding: 2px 6px !important; }
+
+  /* Effects - full width on next line */
+  tr.sb-row td:has(.effects), tr.sb-row td .effects,
+  td.effects { max-width: none; }
+  tr.sb-row td:has(.effects) { order: 4; flex-basis: 100%; font-size: 13px; line-height: 1.4; }
+
+  /* Hide/Unhide button */
+  tr.sb-row td:has(.sb-hide-btn),
+  tr.sb-row td:has(.sb-unhide-btn) { order: 5; margin-left: auto; }
+
+  /* Detail/expand rows */
   tr.sb-detail.visible { display: block; }
   tr.sb-detail td { display: block; padding: 8px !important; }
   tr.sb-detail td[colspan] { width: 100%; }
 
+  /* Burst/nested tables */
+  .burst-table { font-size: 13px; width: 100%; }
+  .burst-table thead tr,
+  .burst-table > tr:first-child,
+  .burst-table > tbody > tr:first-child { display: none; }
+  .burst-table { border-collapse: separate; border-spacing: 0 6px; }
+  tr.bc-row {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 6px; gap: 3px 6px;
+    background: #0f1a2e; border-radius: 4px;
+  }
+  tr.bc-row > td { border-bottom: none; padding: 2px; background: transparent; }
+  tr.bc-row td.bc-chevron { order: 0; width: auto; }
+  /* Icon cells */
+  tr.bc-row > td:has(.burst-icon),
+  tr.bc-row > td:has(.brave-icon-wrap) { order: 1; }
+  .burst-icon { width: 32px; height: 32px; }
+  .brave-icon-wrap { transform: scale(0.7); }
+  /* Middle metadata cells as compact tags */
+  tr.bc-row > td:not(.bc-chevron):not(:last-child):not(:has(.burst-icon)):not(:has(.brave-icon-wrap)) {
+    order: 3; font-size: 12px; color: #aaa;
+    background: #1a1a2e; border-radius: 3px; padding: 2px 6px !important;
+  }
+  /* Effects - full width on second line */
+  tr.bc-row td:last-child { order: 5; flex-basis: 100%; font-size: 13px; }
+  .burst-table td.effects, .burst-table td:has(.effects),
+  tr.bc-row td .effects { max-width: none; }
+
   tr.bc-detail.visible { display: block; }
   tr.bc-detail td { display: block; padding: 6px !important; }
   tr.bc-detail td[colspan] { width: 100%; }
+
+  /* Hero ability & Legend Materia table rows (non-sb-row) */
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) {
+    display: flex; flex-wrap: wrap; align-items: center;
+    padding: 8px; gap: 4px 8px;
+    background: #1a1a2e; border-radius: 6px;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) > td {
+    border-bottom: none; background: transparent; padding: 2px;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td:last-child {
+    flex-basis: 100%; font-size: 13px; line-height: 1.4;
+  }
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td .effects,
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td.effects {
+    max-width: none;
+  }
+
+  /* LM icon sizing */
+  table:not(.burst-table) tr:not(.sb-row):not(.sb-detail):not(:first-child) td img[style*="32px"] {
+    width: 28px !important; height: 28px !important;
+  }
+
+  /* Hidden SBs section */
+  .hidden-sbs-content table { border-collapse: separate; border-spacing: 0 8px; }
 }
 </style>
 </head><body>
