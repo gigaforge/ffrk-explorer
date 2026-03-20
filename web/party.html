@@ -229,19 +229,17 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   td img { width: 36px; height: 36px; }
 
   /* Name cell (3rd visible cell in party SB table: chevron, icon, name) */
-  tr.sb-row td:nth-child(3):not(:has(.sb-icon)):not(.sb-chevron):not(:has(.effects)) { order: 2; font-weight: bold; color: #e94560; font-size: 14px; }
+  tr.sb-row td:nth-child(3):not(:has(.sb-icon)):not(.sb-chevron):not(.effects) { order: 2; font-weight: bold; color: #e94560; font-size: 14px; }
 
   /* Metadata cells (Tier, Type, Element, Time) as inline tags */
-  tr.sb-row td:nth-child(4):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
-  tr.sb-row td:nth-child(5):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
-  tr.sb-row td:nth-child(6):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
-  tr.sb-row td:nth-child(7):not(:has(.effects)):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn))
+  tr.sb-row td:nth-child(4):not(.effects):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(5):not(.effects):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(6):not(.effects):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn)),
+  tr.sb-row td:nth-child(7):not(.effects):not(:has(.sb-hide-btn)):not(:has(.sb-unhide-btn))
   { order: 3; font-size: 12px; color: #aaa; background: #16213e; border-radius: 3px; padding: 2px 6px !important; }
 
   /* Effects - full width on next line */
-  tr.sb-row td:has(.effects), tr.sb-row td .effects,
-  td.effects { max-width: none; }
-  tr.sb-row td:has(.effects) { order: 4; flex-basis: 100%; font-size: 13px; line-height: 1.4; }
+  tr.sb-row td.effects { max-width: none; order: 4; flex-basis: 100%; font-size: 13px; line-height: 1.4; }
 
   /* Hide/Unhide button */
   tr.sb-row td:has(.sb-hide-btn),
@@ -277,8 +275,8 @@ tr.bc-detail td { background: #0a1220; padding: 6px 12px; }
   }
   /* Effects - full width on second line */
   tr.bc-row td:last-child { order: 5; flex-basis: 100%; font-size: 13px; }
-  .burst-table td.effects, .burst-table td:has(.effects),
-  tr.bc-row td .effects { max-width: none; }
+  .burst-table td.effects,
+  tr.bc-row td.effects { max-width: none; }
 
   tr.bc-detail.visible { display: block; }
   tr.bc-detail td { display: block; padding: 6px !important; }
