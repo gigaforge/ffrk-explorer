@@ -12,7 +12,7 @@ func containsCI(text, substr string) bool {
 	return strings.Contains(strings.ToLower(text), strings.ToLower(substr))
 }
 
-var critChanceRe = regexp.MustCompile(`(?i)\d+% critical[\]\s\d]`)
+var critChanceRe = regexp.MustCompile(`(?i)(\d+% critical[\]\s\d]|critical chance \+\d+%)`)
 var critDamageRe = regexp.MustCompile(`(?i)critical damage \+\d+%`)
 var sbGaugeRe = regexp.MustCompile(`(?i)soul break gauge \+`)
 var atbSpeedRe = regexp.MustCompile(`(?i)\d+% atb`)

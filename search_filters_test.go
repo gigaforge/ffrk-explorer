@@ -62,6 +62,26 @@ func TestHasPartyEffectPatternExcludesSecondGrantsClause(t *testing.T) {
 	}
 }
 
+func TestCritChanceAlternatePattern(t *testing.T) {
+	// Basch DASB2 dual-shift: "Critical Chance +100% to party"
+	basch := "Critical Chance +100% to party"
+	if !critChanceRe.MatchString(basch) {
+		t.Fatal("expected critChanceRe to match 'Critical Chance +100%' pattern")
+	}
+
+	// Original pattern still works
+	original := "50% critical chance"
+	if !critChanceRe.MatchString(original) {
+		t.Fatal("expected critChanceRe to still match original '50% critical' pattern")
+	}
+
+	// Party effect detection for the alternate pattern
+	dualShift := "Grants Critical Chance +100% to all allies"
+	if !hasPartyEffectPattern(dualShift, critChanceRe) {
+		t.Fatal("expected party crit chance to match 'Critical Chance +100% to all allies'")
+	}
+}
+
 func TestTextContainsImperilMatchesPrismaticImperilForSpecificElements(t *testing.T) {
 	if !textContainsImperil("Chases with minor Prismatic Imperil for 5 seconds", "Poison") {
 		t.Fatal("expected Poison imperil filter to match Prismatic Imperil text")
